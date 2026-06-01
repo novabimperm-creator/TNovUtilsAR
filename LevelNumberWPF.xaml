@@ -1,0 +1,106 @@
+﻿<Window x:Class="TNovUtilsAR.LevelNumberWPF"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:TNovUtilsAR"
+             mc:Ignorable="d" Width="300"
+        d:DataContext="{d:DesignInstance local:LevelNumberViewModel}"
+            WindowStartupLocation="CenterScreen" 
+                                       AllowsTransparency="True"
+Background="Transparent" 
+            ResizeMode="NoResize" WindowStyle="None">
+    <Window.Resources>
+        <ResourceDictionary>
+
+            <local:InverseConverter x:Key="InverseConverter"/>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/TNovCommon;component/ButtonStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="30"
+              ResizeBorderThickness="5"
+              GlassFrameThickness="0"
+              CornerRadius="12"/>
+    </WindowChrome.WindowChrome>
+    <Border CornerRadius="12"
+    Background="White"
+    BorderBrush="#FF008E43"
+    BorderThickness="1">
+        <Grid>
+            <!-- Верхняя панель (кастомный заголовок) -->
+            <Border Height="30" CornerRadius="12 12 0 0"
+    Background="#FF008E43" 
+    VerticalAlignment="Top"
+    MouseDown="Border_MouseDown">
+                <StackPanel Orientation="Horizontal">
+                    <Button Style="{StaticResource RoundButtonStyle}" 
+Click="escButton_Click" Content="✕"
+HorizontalAlignment="Center" VerticalAlignment="Center"
+Width="20" Height="20" Margin="5,0"
+WindowChrome.IsHitTestVisibleInChrome="True"/>
+                    <Button Style="{StaticResource RoundButtonStyle2}" 
+Click="HelpButton_Click" Content="?"
+HorizontalAlignment="Center" VerticalAlignment="Center"
+Width="20" Height="20" Margin="0"
+WindowChrome.IsHitTestVisibleInChrome="True"/>
+                    <TextBlock Text="Эт.Номер" 
+Foreground="White"
+VerticalAlignment="Center"
+Margin="10,0"/>
+                </StackPanel>
+
+            </Border>
+
+            <!-- Основное содержимое -->
+            <Border Margin="0,30,0,0">
+                <StackPanel Margin="5">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <TextBlock Margin="5" Text="Выберите категории для заполнения параметра:" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <CheckBox BorderBrush="#CCCCCC" x:Name="checkBox1" IsThreeState="False" IsChecked="{Binding walls}" Content="Стены" HorizontalAlignment="Left" Width="250" Margin="5" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <CheckBox BorderBrush="#CCCCCC" x:Name="checkBox2" IsThreeState="False" IsChecked="{Binding floors}" Content="Перекрытия" HorizontalAlignment="Left" Width="250" Margin="5" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <CheckBox BorderBrush="#CCCCCC" x:Name="checkBox3" IsThreeState="False" IsChecked="{Binding ceilings}" Content="Потолки" HorizontalAlignment="Left" Width="250" Margin="5" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <CheckBox BorderBrush="#CCCCCC" x:Name="checkBox4" IsThreeState="False" IsChecked="{Binding instances}" Content="Окна и двери" HorizontalAlignment="Left" Width="250" Margin="5" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <CheckBox BorderBrush="#CCCCCC" x:Name="checkBox5" IsThreeState="False" IsChecked="{Binding rooms}" Content="Помещения" HorizontalAlignment="Left" Width="250" Margin="5" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <CheckBox BorderBrush="#CCCCCC" x:Name="checkBox6" IsThreeState="False" IsChecked="{Binding park}" Content="Парковка" HorizontalAlignment="Left" Width="250" Margin="5" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <CheckBox BorderBrush="#CCCCCC" x:Name="checkBox7" IsThreeState="False" IsChecked="{Binding other}" Content="Мебель, лестницы, ограждения и пр." HorizontalAlignment="Left" Width="250" Margin="5" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <CheckBox BorderBrush="#CCCCCC" x:Name="checkBox8" IsThreeState="False" IsChecked="{Binding beams}" Content="Балки и перемычки" HorizontalAlignment="Left" Width="250" Margin="5" 
+                  IsEnabled="{Binding checkBox8islocked, Converter={StaticResource InverseConverter}}"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <CheckBox BorderBrush="#CCCCCC" x:Name="checkBox9" IsThreeState="False" IsChecked="{Binding holes}" Content="Отверстия" HorizontalAlignment="Left" Width="250" Margin="5" 
+          IsEnabled="{Binding checkBox8islocked, Converter={StaticResource InverseConverter}}"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="Отмена" x:Name="escButton" IsCancel="True" Click="escButton_Click" MinWidth="60" MinHeight="25" Margin="5" Style="{StaticResource CustomButtonStyle}" />
+                        <Button Content="Применить" x:Name="acceptButton" IsDefault="True" Click="acceptButton_Click" MinWidth="120" Margin="5" Style="{StaticResource CustomButtonStyle}" />
+                    </StackPanel>
+
+                </StackPanel>
+
+
+            </Border>
+        </Grid>
+    </Border>
+
+
+</Window>

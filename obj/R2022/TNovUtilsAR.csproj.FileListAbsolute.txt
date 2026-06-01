@@ -1,0 +1,16 @@
+\\fs-nova\Distr\0.For Admin\_TNov\build\2022\TNovUtilsAR.dll.config
+\\fs-nova\Distr\0.For Admin\_TNov\build\2022\TNovUtilsAR.dll
+\\fs-nova\Distr\0.For Admin\_TNov\build\2022\TNovUtilsAR.pdb
+Z:\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR.csproj.AssemblyReference.cache
+Z:\DEV\TNovUtilsAR\obj\R2022\CopyWindowsWPF.g.cs
+Z:\DEV\TNovUtilsAR\obj\R2022\LevelNumberWPF.g.cs
+Z:\DEV\TNovUtilsAR\obj\R2022\GeneratedInternalTypeHelper.g.cs
+Z:\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR_MarkupCompile.cache
+Z:\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR_MarkupCompile.lref
+Z:\DEV\TNovUtilsAR\obj\R2022\CopyWindowsWPF.baml
+Z:\DEV\TNovUtilsAR\obj\R2022\LevelNumberWPF.baml
+Z:\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR.g.resources
+Z:\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR.csproj.CoreCompileInputs.cache
+Z:\DEV\TNovUtilsAR\obj\R2022\TNovUtil.71A82414.Up2Date
+Z:\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR.dll
+Z:\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR.pdb

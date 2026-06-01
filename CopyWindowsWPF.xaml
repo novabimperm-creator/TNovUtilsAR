@@ -1,0 +1,134 @@
+﻿<Window x:Class="TNovUtilsAR.CopyWindowsWPF"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:TNovUtilsAR"
+             mc:Ignorable="d" Width="650" Height="500"
+            WindowStartupLocation="CenterScreen" 
+                                       AllowsTransparency="True"
+Background="Transparent" 
+            ResizeMode="NoResize" WindowStyle="None">
+    <Window.Resources>
+
+        <ResourceDictionary>
+            <BooleanToVisibilityConverter x:Key="booleanToVisibilityConverter"/>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/TNovCommon;component/ButtonStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="30"
+              ResizeBorderThickness="5"
+              GlassFrameThickness="0"
+              CornerRadius="12"/>
+    </WindowChrome.WindowChrome>
+
+    
+
+
+        <Border CornerRadius="12"
+        Background="White"
+        BorderBrush="#FF008E43"
+        BorderThickness="1">
+            <Grid>
+                <!-- Верхняя панель (кастомный заголовок) -->
+                <Border Height="30" CornerRadius="12 12 0 0"
+    Background="#FF008E43" 
+    VerticalAlignment="Top"
+    MouseDown="Border_MouseDown">
+                    <StackPanel Orientation="Horizontal">
+                        <Button Style="{StaticResource RoundButtonStyle}" 
+Click="escButton_Click" Content="✕"
+HorizontalAlignment="Center" VerticalAlignment="Center"
+Width="20" Height="20" Margin="5,0"
+WindowChrome.IsHitTestVisibleInChrome="True"/>
+                        <Button Style="{StaticResource RoundButtonStyle2}" 
+Click="HelpButton_Click" Content="?"
+HorizontalAlignment="Center" VerticalAlignment="Center"
+Width="20" Height="20" Margin="0"
+WindowChrome.IsHitTestVisibleInChrome="True"/>
+                        <TextBlock Text="Проемщик" 
+Foreground="White"
+VerticalAlignment="Center"
+Margin="10,0"/>
+                    </StackPanel>
+
+                </Border>
+
+                <!-- Основное содержимое -->
+                <Border Margin="0,30,0,0">
+                <Grid ShowGridLines="False">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel VerticalAlignment="Center" Margin="5" Grid.Row="0">
+                        <TextBlock Text="Отмеченные элементы будут скопированы (старые удалены)" Margin="5"/>
+
+                    </StackPanel>
+
+                    <!-- Панель фильтрации по категории -->
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="5">
+                        <TextBlock Text="Показать:" VerticalAlignment="Center" Margin="5"/>
+                        <ComboBox x:Name="CategoryFilterCombo" Width="120" SelectionChanged="CategoryFilter_Changed">
+                            <ComboBoxItem IsSelected="True">Все</ComboBoxItem>
+                            <ComboBoxItem>Окна</ComboBoxItem>
+                            <ComboBoxItem>Двери</ComboBoxItem>
+                        </ComboBox>
+                    </StackPanel>
+                    <!-- Список элементов -->
+                    <ListView Grid.Row="2" Name="ItemsListView" ItemsSource="{Binding}">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Выбрать" Width="60">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsSelected}" HorizontalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Категория" Width="120" DisplayMemberBinding="{Binding Category}"/>
+                                <GridViewColumn Header="Тип" Width="200" DisplayMemberBinding="{Binding TypeName}"/>
+                                <GridViewColumn Header="Высота (мм)" Width="100" DisplayMemberBinding="{Binding HeightMm, StringFormat={}{0:F0}}"/>
+                                <GridViewColumn Header="Ширина (мм)" Width="100" DisplayMemberBinding="{Binding WidthMm, StringFormat={}{0:F0}}"/>
+                            </GridView>
+                        </ListView.View>
+                        <ListView.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.HeaderTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Name}" FontWeight="Bold" Background="LightGray" Padding="5"/>
+                                    </DataTemplate>
+                                </GroupStyle.HeaderTemplate>
+                            </GroupStyle>
+                        </ListView.GroupStyle>
+                    </ListView>
+                    <Grid Grid.Row="3" Margin="5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Ввод глубины -->
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left">
+                            <TextBlock Text="Глубина проема (мм):" VerticalAlignment="Center" Margin="5"/>
+                            <TextBox x:Name="DepthTextBox" Width="100" Text="500" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- Кнопки -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Style="{StaticResource CustomButtonStyle}" Content="Закрыть" x:Name="escButton" Click="escButton_Click" MinWidth="90" MinHeight="25" Margin="5" />
+                            <Button Style="{StaticResource CustomButtonStyle}" Content="Выбрать все" Click="SelectAll_Click" Width="90" MinHeight="25" Margin="5"/>
+                            <Button Style="{StaticResource CustomButtonStyle}" Content="Снять все" Click="DeselectAll_Click" Width="90" MinHeight="25" Margin="5"/>
+                            <Button Style="{StaticResource CustomButtonStyle}" Content="Создать" Click="Create_Click" Width="90" MinHeight="25" Margin="5"/>
+                        </StackPanel>
+                    </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+    </Border>
+</Window>
