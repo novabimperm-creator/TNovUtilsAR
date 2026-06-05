@@ -14,3 +14,8 @@ Z:\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR.csproj.CoreCompileInputs.cache
 Z:\DEV\TNovUtilsAR\obj\R2022\TNovUtil.71A82414.Up2Date
 Z:\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR.dll
 Z:\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR.pdb
+\\fs-nova\Distr\0.For Admin\_TNov\build\2022\runtimes\win-x86\native\WebView2Loader.dll
+\\fs-nova\Distr\0.For Admin\_TNov\build\2022\runtimes\win-x64\native\WebView2Loader.dll
+\\fs-nova\Distr\0.For Admin\_TNov\build\2022\runtimes\win-arm64\native\WebView2Loader.dll
+Z:\DEV\TNovUtilsAR\obj\R2022\AM\CreateViewsWindow.baml
+Z:\DEV\TNovUtilsAR\obj\R2022\AM\CreateViewsWindow.g.cs
