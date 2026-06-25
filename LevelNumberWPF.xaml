@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:TNovUtilsAR"
-             mc:Ignorable="d" Width="300"
+             mc:Ignorable="d" Width="400"
         d:DataContext="{d:DesignInstance local:LevelNumberViewModel}"
             WindowStartupLocation="CenterScreen" 
                                        AllowsTransparency="True"
@@ -89,6 +89,13 @@ Margin="10,0"/>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                         <CheckBox BorderBrush="#CCCCCC" x:Name="checkBox9" IsThreeState="False" IsChecked="{Binding holes}" Content="Отверстия" HorizontalAlignment="Left" Width="250" Margin="5" 
           IsEnabled="{Binding checkBox8islocked, Converter={StaticResource InverseConverter}}"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <TextBlock Margin="5" Text="Выберите сценарий работы:" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <RadioButton BorderBrush="#CCCCCC" x:Name="rB1" GroupName="elems" IsThreeState="False" IsChecked="{Binding all}" Content="Все элементы" HorizontalAlignment="Left" Margin="5" />
+                        <RadioButton BorderBrush="#CCCCCC" x:Name="rB2" GroupName="elems" IsThreeState="False" IsChecked="{Binding selected}" Content="Выбранные элементы" HorizontalAlignment="Left" Margin="5" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                         <Button Content="Отмена" x:Name="escButton" IsCancel="True" Click="escButton_Click" MinWidth="60" MinHeight="25" Margin="5" Style="{StaticResource CustomButtonStyle}" />

@@ -2,6 +2,7 @@
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Architecture;
 using Autodesk.Revit.UI;
+using Autodesk.Revit.UI.Selection;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -11,6 +12,7 @@ using System.Linq;
 using System.Net.NetworkInformation;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Windows.Documents;
 using System.Windows.Threading;
 using TNovCommon;
 
@@ -84,8 +86,8 @@ namespace TNovUtilsAR
 
             Guid NLevelNumberParamGuid = new Guid("4d2aa1b8-727c-43a1-8b1e-8c22dd484e11"); //N_Эт.Номер
 
-            #region Сбор элементов
-            Logger.Log("Сбор элементов",1);
+            
+            #region Возможные неправильные имена уровней
             List<Level> levels = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Levels)   //фильтр по категории Уровни
                                                                          .WhereElementIsNotElementType()    //фильтр только экземпляры
                                                                          .Cast<Level>()                     //элементы категории Уровни
@@ -106,142 +108,147 @@ namespace TNovUtilsAR
                 } 
             }
 
+            
+            if (ec > 0)
+            {
+                string wn = "";
+                int i = 0;
+                foreach (string wname in wrongnames)
+                {
+                    if (i == 0) { wn = wn + wname; }
+                    else { wn = wn + ", " + wname; }
+                    i++;
+                }
+                //сообщение об ошибке
+                string info2txt = "Уровни " + wn + " названы не по регламенту!\r\n" +
+                    "Структура наименования имеет вид(с пробелами без нижних подчеркиваний):\r\n" +
+                    "АА ББ ВВ, где\r\nАА – код уровня в цифровом формате(-01, 01, 02…);\r\n" +
+                    "ББ – отметка уровня от 0.000(например, -3.200 или + 1.500);\r\n" +
+                    "ВВ – название уровня(например, Автостоянка, Подвал, Этаж 7, Покрытие).\r\nПример наименования уровня:\r\n" +
+                    "\t - 01 - 3.200 Подвал\r\n" +
+                    "\t05 + 12.850 Этаж 5\r\n";
+                var info2 = new InfoWindow400(info2txt); info2.ShowDialog();
+                return Result.Failed;
+            }
+            #endregion
 
-            List<Wall> walls = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Walls)   //фильтр по категории Стены
+            #region Сбор элементов
+            Logger.Log("Сбор элементов", 1);
+            List<Element> elems = new List<Element>();
+            List<Element> walls = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Walls)   //фильтр по категории Стены
                                                                          .WhereElementIsNotElementType()    //фильтр только экземпляры
                                                                          .OfClass(typeof(Wall))         //отсеиваем модели в контексте
-                                                                         .Cast<Wall>()                     //элементы категории Стены
+                                                                         .Cast<Element>()                     //элементы категории Стены
                                                                          .ToList();                         //формируем список
-
-            List<FamilyInstance> wallsFI = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Walls)   //Стены семействами
+            elems.AddRange(walls);
+            List<Element> wallsFI = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Walls)   //Стены семействами
                                                                          .WhereElementIsNotElementType()
                                                                          .OfClass(typeof(FamilyInstance))
-                                                                         .Cast<FamilyInstance>()
+                                                                         .Cast<Element>()
                                                                          .ToList();
-
-            List<Autodesk.Revit.DB.Floor> floors = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Floors)   //фильтр по категории Перекрытия
+            elems.AddRange(wallsFI);
+            List<Element> floors = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Floors)   //фильтр по категории Перекрытия
                                                                          .WhereElementIsNotElementType()
                                                                          .OfClass(typeof(Autodesk.Revit.DB.Floor))
-                                                                         .Cast<Autodesk.Revit.DB.Floor>()                     
+                                                                         .Cast<Element>()                     
                                                                          .ToList();
-
-            List<FamilyInstance> floorsFI = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Floors)   //Плиты (полы) семействами
+            elems.AddRange(floors);
+            List<Element> floorsFI = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Floors)   //Плиты (полы) семействами
                                                                          .WhereElementIsNotElementType()
                                                                          .OfClass(typeof(FamilyInstance))
-                                                                         .Cast<FamilyInstance>()
+                                                                         .Cast<Element>()
                                                                          .ToList();
-
-            List<Ceiling> ceilings = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Ceilings)   //фильтр по категории Потолки
+            elems.AddRange(floorsFI);
+            List<Element> ceilings = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Ceilings)   //фильтр по категории Потолки
                                                                          .WhereElementIsNotElementType()
                                                                          .OfClass(typeof(Ceiling))
-                                                                         .Cast<Ceiling>()
+                                                                         .Cast<Element>()
                                                                          .ToList();
-
-            List<FamilyInstance> ceilingsFI = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Ceilings)   //Потолки семействами
+            elems.AddRange(ceilings);
+            List<Element> ceilingsFI = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Ceilings)   //Потолки семействами
                                                                          .WhereElementIsNotElementType()
                                                                          .OfClass(typeof(FamilyInstance))
-                                                                         .Cast<FamilyInstance>()
+                                                                         .Cast<Element>()
                                                                          .ToList();
-
-            List<FamilyInstance> windows = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Windows)   //фильтр по категории Окна
+            elems.AddRange(ceilingsFI);
+            List<Element> windows = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Windows)   //фильтр по категории Окна
                                                                          .WhereElementIsNotElementType()
-                                                                         .Cast<FamilyInstance>()
+                                                                         .Cast<Element>()
                                                                          //.Where(it => it.Symbol.get_Parameter(gm).AsString() == "Окно") //только род семейства
                                                                          .ToList();
-
-            List<FamilyInstance> doors = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Doors)   //фильтр по категории Двери
+            elems.AddRange(windows);
+            List<Element> doors = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Doors)   //фильтр по категории Двери
                                                                          .WhereElementIsNotElementType()
-                                                                         .Cast<FamilyInstance>()
+                                                                         .Cast<Element>()
                                                                          //.Where(it => it.Symbol.get_Parameter(gm).AsString() == "Дверь") //только род семейства
                                                                          .ToList();
-            
-            List<FamilyInstance> beams = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_StructuralFraming)   //фильтр по категории Каркас несущий
+            elems.AddRange(doors);
+            List<Element> beams = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_StructuralFraming)   //фильтр по категории Каркас несущий
                                                                          .WhereElementIsNotElementType()
-                                                                         .Cast<FamilyInstance>()
+                                                                         .Cast<Element>()
                                                                          .ToList();
-
-            List<Room> rooms = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Rooms)   //фильтр по категории Помещения
+            elems.AddRange(beams);
+            List<Element> rooms = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Rooms)   //фильтр по категории Помещения
                                                                          .WhereElementIsNotElementType()
-                                                                         .Cast<Room>()
+                                                                         .Cast<Element>()
                                                                          .ToList();
-
-            List<FamilyInstance> parks = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Parking)   //фильтр по категории Парковка
+            elems.AddRange(rooms);
+            List<Element> parks = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Parking)   //фильтр по категории Парковка
                                                                          .WhereElementIsNotElementType()
-                                                                         .Cast<FamilyInstance>()
+                                                                         .Cast<Element>()
                                                                          .ToList();
-
-            List<FamilyInstance> fur = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Furniture)   //фильтр по категории Мебель
+            elems.AddRange(parks);
+            List<Element> fur = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Furniture)   //фильтр по категории Мебель
                                                                          .WhereElementIsNotElementType()
-                                                                         .Cast<FamilyInstance>()
+                                                                         .Cast<Element>()
                                                                          .ToList();
-
-            List<FamilyInstance> GMs = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_GenericModel)   //фильтр по категории Об модели
+            elems.AddRange(fur);
+            List<Element> GMs = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_GenericModel)   //фильтр по категории Об модели
                                                                          .WhereElementIsNotElementType()
                                                                          .OfClass(typeof(FamilyInstance))
-                                                                         .Cast<FamilyInstance>()
+                                                                         .Cast<Element>()
                                                                          .ToList();
-
+            elems.AddRange(GMs);
             List<Element> obor = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_MechanicalEquipment)
                 .WhereElementIsNotElementType()
                 .Cast<Element>()
                 .ToList();
-
+            elems.AddRange(obor);
             List<Element> sobor = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_SpecialityEquipment)
                 .WhereElementIsNotElementType()
                 .Cast<Element>()
                 .ToList();
-
+            elems.AddRange(sobor);
             List<Element> Santeh = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_PlumbingFixtures)
                 .WhereElementIsNotElementType()
                 .Cast<Element>()
                 .ToList();
-
-            List<Autodesk.Revit.DB.Architecture.Stairs> stairs = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Stairs)   //Лестницы
+            elems.AddRange(Santeh);
+            List<Element> stairs = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Stairs)   //Лестницы
                                                                          .WhereElementIsNotElementType()
                                                                          .OfClass(typeof(Autodesk.Revit.DB.Architecture.Stairs))  //отсеиваем модели в контексте
-                                                                         .Cast<Autodesk.Revit.DB.Architecture.Stairs>()
+                                                                         .Cast<Element>()
                                                                          .ToList();
-            List<FamilyInstance> stairs2 = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Stairs)   //Лестницы семействами
+            elems.AddRange(stairs);
+            List<Element> stairs2 = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Stairs)   //Лестницы семействами
                                                                          .WhereElementIsNotElementType()
                                                                          .OfClass(typeof(Autodesk.Revit.DB.FamilyInstance))
-                                                                         .Cast<FamilyInstance>()
+                                                                         .Cast<Element>()
                                                                          .ToList();
-            List<Autodesk.Revit.DB.Architecture.Railing> railings = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_StairsRailing)   //Ограждения
+            elems.AddRange(stairs2);
+            List<Element> railings = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_StairsRailing)   //Ограждения
                                                                          .WhereElementIsNotElementType()
                                                                          .OfClass(typeof(Autodesk.Revit.DB.Architecture.Railing)) //отсеиваем модели в контексте
-                                                                         .Cast<Autodesk.Revit.DB.Architecture.Railing>()
+                                                                         .Cast<Element>()
                                                                          .ToList();
-            List<FamilyInstance> railings2 = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_StairsRailing)   //Ограждения семействами
+            elems.AddRange(railings);
+            List<Element> railings2 = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_StairsRailing)   //Ограждения семействами
                                                                          .WhereElementIsNotElementType()
                                                                          .OfClass(typeof(Autodesk.Revit.DB.FamilyInstance))
-                                                                         .Cast<FamilyInstance>()
+                                                                         .Cast<Element>()
                                                                          .ToList();
-
-            Logger.Log("Элементы собраны. Создаем списки для работы",1);
-
-            List<FamilyInstance> windowsdoors = new List<FamilyInstance>(windows.Count + doors.Count); //общий список окна двери
-            windowsdoors.AddRange(windows);
-            windowsdoors.AddRange(doors);
-
-            List<FamilyInstance> beams1 = new List<FamilyInstance>(); //перемычки
-            foreach (FamilyInstance elem in beams)
-            {
-                bool air = elem.Name.Contains("Аэратор");
-                if (air == false) { beams1.Add(elem); }
-            }
-
-            List<FamilyInstance> GMs1 = new List<FamilyInstance>();
-            List<FamilyInstance> holes = new List<FamilyInstance>();
-            foreach (FamilyInstance elem in GMs)
-            {
-                string gmvalue = elem.Symbol.get_Parameter(BuiltInParameter.ALL_MODEL_MODEL).AsString();
-                bool isHole = false;
-                if (gmvalue != null)
-                {
-                    if (gmvalue.Contains("Отверстие")) { isHole = true; holes.Add(elem); }
-                }
-                if(!isHole) GMs1.Add(elem);
-            }
+            elems.AddRange(railings2);
+            
             #endregion
 
             #region Диалог
@@ -286,46 +293,101 @@ namespace TNovUtilsAR
             bool runInstances = viewModel.instances; bool runRooms = viewModel.rooms; bool runPark = viewModel.park; bool runOther = viewModel.other;
             string section = viewModel.section; bool runBeams = viewModel.beams; bool runHoles = viewModel.holes;
 
-            int failscount = 0;
-            List<string> failed = new List<string>(); //пустой список id элементов с недоступным параметром Закрепить
-            string categories = ":";
-            int allcount = 0;
-            if (runWalls) { categories = categories + " стены"; allcount += walls.Count+wallsFI.Count; }; 
-            if (runFloors) { categories = categories + " перекрытия"; allcount += floors.Count+floorsFI.Count; }; 
-            if (runCeilings) { categories = categories + " потолки"; allcount += ceilings.Count+ceilingsFI.Count; }; 
-            if (runInstances) { categories = categories + " окна двери"; allcount += windowsdoors.Count; };
-            if (runBeams) { categories = categories + " перемычки"; allcount += beams1.Count; };
-            if (runRooms) { categories = categories + " помещения"; allcount += rooms.Count; };
-            if (runPark) { categories = categories + " паркинг"; allcount += parks.Count; };
-            if (runOther) { categories = categories + " прочее"; allcount += fur.Count+ obor.Count+ sobor.Count+ Santeh.Count+ stairs.Count+ stairs2.Count+ railings.Count+ railings2.Count+GMs1.Count; };
-            if (runHoles) { categories = categories + " отверстия"; allcount += holes.Count; };
             #endregion
 
-            Logger.Log("Выбор сделан:"+ categories,1);
-
-            #region Возможные неправильные имена уровней
-            if (ec > 0)
+            #region Выборка
+            List<ElementId> selectedIds = new List<ElementId>();
+            //анализ текущей выборки
+            Logger.Log("Анализ текущей выборки", 1);
+            Autodesk.Revit.UI.Selection.Selection selection = commandData.Application.ActiveUIDocument.Selection;
+            ICollection<ElementId> preselectedIds = selection.GetElementIds();
+            if (preselectedIds.Count > 0)
             {
-                string wn = "";
-                int i = 0;
-                foreach (string wname in wrongnames)
+                foreach (ElementId id in preselectedIds) { selectedIds.Add(id); }
+            }
+            else  //запускаем выбор элементов если ничего не выбрано
+            {
+                if (viewModel.selected)
                 {
-                    if (i == 0) { wn = wn + wname; }
-                    else { wn = wn + ", " + wname; }
-                    i++;
+                    Selection elemselection = uidoc.Selection;
+
+                    List<Element> selectedElements = null;
+
+
+                    try
+                    {
+                        selectedElements = elemselection.PickElementsByRectangle("Выберите элементы при помощи рамки (Esc - отмена)").ToList();
+                    }
+                    catch (Autodesk.Revit.Exceptions.OperationCanceledException e)
+                    {
+                        Logger.Log("Запуск отменен пользователем. Завершение работы: " + e.Message, 3);
+                        return Result.Cancelled;
+                    }
+                    foreach (Element element in selectedElements) selectedIds.Add(element.Id);
                 }
-                //сообщение об ошибке
-                string info2txt = "Уровни " + wn + " названы не по регламенту!\r\n" +
-                    "Структура наименования имеет вид(с пробелами без нижних подчеркиваний):\r\n" +
-                    "АА ББ ВВ, где\r\nАА – код уровня в цифровом формате(-01, 01, 02…);\r\n" +
-                    "ББ – отметка уровня от 0.000(например, -3.200 или + 1.500);\r\n" +
-                    "ВВ – название уровня(например, Автостоянка, Подвал, Этаж 7, Покрытие).\r\nПример наименования уровня:\r\n" +
-                    "\t - 01 - 3.200 Подвал\r\n" +
-                    "\t05 + 12.850 Этаж 5\r\n";
-                var info2 = new InfoWindow400(info2txt); info2.ShowDialog();
-                return Result.Failed;
+            }
+            //итоговый список
+            if (viewModel.selected)
+            {
+                List<Element> elems1 = new List<Element>();
+                foreach(var id in selectedIds) 
+                {
+                    Element el = doc.GetElement(id); if(el != null) elems1.Add(el);
+                }
+                elems = elems1;
+            }
+            List<TNovElement> elemsToWork = new List<TNovElement>(); int allcount = 0;
+            foreach (var elem in elems)
+            {
+                TNovElement tNovElem = new TNovElement(elem);
+                if (tNovElem.TNovCategory == "Default") continue;
+                switch (tNovElem.TNovCategory)
+                {
+                    case "Wall":
+                        if (viewModel.walls) { allcount++; elemsToWork.Add(tNovElem); }
+                        ; break;
+                    case "FamilyInstance_Wall":
+                        if (viewModel.walls) { allcount++; elemsToWork.Add(tNovElem); }
+                        ; break;
+                    case "Floor":
+                        if (viewModel.floors) { allcount++; elemsToWork.Add(tNovElem); }
+                        ; break;
+                    case "FamilyInstance_Floor":
+                        if (viewModel.floors) { allcount++; elemsToWork.Add(tNovElem); }
+                        ; break;
+                    case "Ceiling":
+                        if (viewModel.ceilings) { allcount++; elemsToWork.Add(tNovElem); }
+                        ; break;
+                    case "FamilyInstance_Ceiling":
+                        if (viewModel.ceilings) { allcount++; elemsToWork.Add(tNovElem); }
+                        ; break;
+                    case "FamilyInstance_DoorWindow":
+                        if(viewModel.instances) { allcount++; elemsToWork.Add(tNovElem); }
+                        ; break;
+                    case "Room":
+                        if (viewModel.rooms) { allcount++; elemsToWork.Add(tNovElem); }
+                        ; break;
+                    case "FamilyInstance_Parking":
+                        if (viewModel.park) { allcount++; elemsToWork.Add(tNovElem); }
+                        ; break;
+                    case "FamilyInstance_Other":
+                        if (viewModel.other) { allcount++; elemsToWork.Add(tNovElem); }
+                        ; break;
+                    case "FamilyInstance_Hole":
+                        if (viewModel.holes) { allcount++; elemsToWork.Add(tNovElem); }
+                        ; break;
+                    case "FamilyInstance_Beam":
+                        if (viewModel.beams) { allcount++; elemsToWork.Add(tNovElem); }
+                        ; break;
+                }
+                
             }
             #endregion
+
+
+                int failscount = 0;
+            List<string> failed = new List<string>(); //пустой список id элементов с недоступным параметром Закрепить
+           
 
             bool unhandledError = false;
             #region Основной код
@@ -333,7 +395,7 @@ namespace TNovUtilsAR
             {
                 try
                 {
-                    transaction.Start("TNov - заполнить Эт.Номер");
+                    transaction.Start("TNov - Эт.Номер");
                     Logger.Log("Открываем транзакцию", 1);
 
                     Thread thread = new Thread(new ThreadStart(this.ThreadStartingPoint));
@@ -348,377 +410,39 @@ namespace TNovUtilsAR
                     this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Maximum = (double)allcount));
                     this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.maxvalue.Text = allcount.ToString()));
 
-                    if (runWalls && walls.Count > 0)
+                    foreach(var tNovElem in elemsToWork) //новое: универсальный цикл по всем элементам
                     {
-                        Logger.Log("Стены:", 1);
-                        foreach (var elem in walls) //СТЕНЫ
+                        Element elem = doc.GetElement(tNovElem.elem.Id);
+                        Logger.Log(elem.Id.IntegerValue.ToString(), 2);
+                        Parameter param0 = elem.get_Parameter(BuiltInParameter.LEVEL_PARAM); //по умолчанию: Уровень
+
+                        if (tNovElem.TNovCategory == "Wall")
+                            param0 = elem.get_Parameter(BuiltInParameter.WALL_BASE_CONSTRAINT);
+                        else if (tNovElem.TNovCategory == "Room")
+                            param0 = elem.get_Parameter(BuiltInParameter.ROOM_LEVEL_ID);
+                        else if (tNovElem.TNovCategory.Contains("FamilyInstance"))
+                            param0 = elem.get_Parameter(BuiltInParameter.SCHEDULE_LEVEL_PARAM);
+                        
+                        //заполнение параметра
+                        if (param0 != null && param0.AsElementId().IntegerValue > 0)
                         {
+                            SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
                             PBCount++;
                             this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
                             this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
 
-                            Autodesk.Revit.DB.Parameter param0 = elem.get_Parameter(BuiltInParameter.WALL_BASE_CONSTRAINT);
-                            if (param0 != null)
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
+                            if (!success) 
+                            { 
+                                failed.Add(elem.Id.ToString()); failscount++;  
                             }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
                         }
-                    }
-                    if (runWalls && wallsFI.Count > 0)
-                    {
-                        Logger.Log("Стены (семейства):", 1);
-                        foreach (var elem in wallsFI) //СТЕНЫ семействами
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.LookupParameter("Уровень");
-                            if (param0 != null && param0.AsValueString() != "")
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
+                        else 
+                        { 
+                            failed.Add(elem.Id.ToString()); failscount++; 
+                            Logger.Log(elem.Id.ToString() + " - параметр Уровень отсутствует или пуст", 4); 
                         }
+
                     }
-                    if (runFloors && floors.Count > 0)
-                    {
-                        Logger.Log("Перекрытия:", 1);
-                        foreach (var elem in floors) //ПЛИТЫ
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.get_Parameter(BuiltInParameter.LEVEL_PARAM);
-                            if (param0 != null)
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
-                        }
-                    }
-                    if (runFloors && floorsFI.Count > 0)
-                    {
-                        Logger.Log("Перекрытия (семейства):", 1);
-                        foreach (var elem in floorsFI) //ПЛИТЫ семействами
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.LookupParameter("Уровень");
-                            if (param0 != null && param0.AsValueString() != "")
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
-                        }
-                    }
-                    if (runCeilings && ceilings.Count > 0)
-                    {
-                        Logger.Log("Перекрытия:", 1);
-                        foreach (var elem in ceilings) //ПОТОЛКИ
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.get_Parameter(BuiltInParameter.LEVEL_PARAM);
-                            if (param0 != null)
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
-                        }
-                    }
-                    if (runCeilings && ceilingsFI.Count > 0)
-                    {
-                        Logger.Log("Перекрытия (семейства):", 1);
-                        foreach (var elem in ceilingsFI) //ПОТОЛКИ семействами
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.LookupParameter("Уровень");
-                            if (param0 != null && param0.AsValueString() != "")
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
-                        }
-                    }
-                    if (runInstances && windowsdoors.Count > 0)
-                    {
-                        Logger.Log("Окна двери:", 1);
-                        foreach (var elem in windowsdoors) //ОКНА ДВЕРИ
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.LookupParameter("Уровень");
-                            if (param0 != null && param0.AsValueString() != "")
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
-                        }
-                    }
-                    if (runBeams && beams1.Count > 0)
-                    {
-                        Logger.Log("Перемычки:", 1);
-                        foreach (var elem in beams1) //ПЕРЕМЫЧКИ
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.LookupParameter("Уровень");
-                            if (param0 != null && param0.AsValueString() != "")
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
-                        }
-                    }
-                    if (runHoles && holes.Count > 0)
-                    {
-                        Logger.Log("Отверстия:", 1);
-                        foreach (var elem in holes) //ОТВЕРСТИЯ
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.LookupParameter("Уровень");
-                            if (param0 != null && param0.AsValueString() != "")
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
-                        }
-                    }
-                    if (runRooms && rooms.Count > 0)
-                    {
-                        Logger.Log("Помещения:", 1);
-                        foreach (var elem in rooms) //ПОМЕЩЕНИЯ
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            double area = elem.get_Parameter(BuiltInParameter.ROOM_AREA).AsDouble();
-                            if (area == 0) continue; //не размещено, 06.26
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.get_Parameter(BuiltInParameter.LEVEL_NAME);//получаем параметр "Уровень"
-                            if (param0 != null && param0.AsValueString() != "")
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
-                        }
-                    }
-                    if (runPark && parks.Count > 0)
-                    {
-                        Logger.Log("Парковка:", 1);
-                        foreach (var elem in parks) //ПАРКИНГ
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.LookupParameter("Уровень");
-                            if (param0 != null && param0.AsValueString() != "")
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
-                        }
-                    }
-                    if (runOther && fur.Count > 0)
-                    {
-                        Logger.Log("Мебель:", 1);
-                        foreach (var elem in fur) //Мебель
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.LookupParameter("Уровень");
-                            if (param0 != null && param0.AsValueString() != "")
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
-                        }
-                    }
-                    if (runOther && obor.Count > 0)
-                    {
-                        Logger.Log("Оборудование:", 1);
-                        foreach (var elem in obor) //Оборудование
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.LookupParameter("Уровень");
-                            if (param0 != null && param0.AsValueString() != "")
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
-                        }
-                    }
-                    if (runOther && sobor.Count > 0)
-                    {
-                        Logger.Log("Спецоборудование:", 1);
-                        foreach (var elem in sobor) //Спецоборудование
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.LookupParameter("Уровень");
-                            if (param0 != null && param0.AsValueString() != "")
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
-                        }
-                    }
-                    if (runOther && Santeh.Count > 0)
-                    {
-                        Logger.Log("Сантехника:", 1);
-                        foreach (var elem in Santeh) //Сантехника 
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.get_Parameter(BuiltInParameter.SCHEDULE_LEVEL_PARAM);
-                            if (param0 != null && param0.AsValueString() != "")
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
-                        }
-                    }
-                    if (runOther && stairs.Count > 0)
-                    {
-                        Logger.Log("Лестницы:", 1);
-                        foreach (var elem in stairs) //Лестницы
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.get_Parameter(BuiltInParameter.STAIRS_BASE_LEVEL_PARAM);//получаем параметр "Нижний уровень"
-                            if (param0 != null)
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
-                        }
-                    }
-                    if (runOther && stairs2.Count > 0)
-                    {
-                        Logger.Log("Лестницы семействами:", 1);
-                        foreach (var elem in stairs2) //Лестницы семействами
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.LookupParameter("Уровень");
-                            if (param0 != null && param0.AsValueString() != "")
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
-                        }
-                    }
-                    if (runOther && railings.Count > 0)
-                    {
-                        Logger.Log("Ограждения:", 1);
-                        foreach (var elem in railings) //Ограждения
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.get_Parameter(BuiltInParameter.STAIRS_RAILING_BASE_LEVEL_PARAM);//получаем параметр "Базовый уровень"
-                            if (param0 != null && param0.AsValueString() != "")
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else if (elem.HasHost)
-                            {
-                                SetLevelParamByHost(elem, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
-                        }
-                    }
-                    if (runOther && railings2.Count > 0)
-                    {
-                        Logger.Log("Ограждения семействами:", 1);
-                        foreach (var elem in railings2) //Ограждения семействами
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.LookupParameter("Уровень");
-                            if (param0 != null && param0.AsValueString() != "")
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
-                        }
-                    }
-                    if (runOther && GMs1.Count > 0)
-                    {
-                        Logger.Log("Обобщенные модели:", 1);
-                        foreach (var elem in GMs1) //Обобщенные модели
-                        {
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-
-                            Autodesk.Revit.DB.Parameter param0 = elem.LookupParameter("Уровень");
-                            if (param0 != null && param0.AsValueString() != "")
-                            {
-                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                                if (!success) { failed.Add(elem.Id.ToString()); failscount++; }
-                            }
-                            else { failed.Add(elem.Id.ToString()); failscount++; Logger.Log("      " + elem.Id.ToString() + " ошибка", 4); }
-                        }
-                    }
-                    Logger.Log("Элементы обработаны.", 1);
-
-
                     transaction.Commit();
                     Logger.Log("Закрываем транзакцию.", 1);
                 }
@@ -779,17 +503,19 @@ namespace TNovUtilsAR
             string eid = elemid.ToString();
             Element elem = RevitAPI.Document.GetElement(elemid);
             Logger.Log("   Элемент " + eid + ":", 2);
-            string level = param0.AsValueString(); //получаем значение исходного параметра
-            level = level.Replace("_", " ");
-            string[] parts = level.Split(new char[] { ' ' }); //делим имя пробелами
-            level = parts[0];
-            if (level.Contains('.'))
+            ElementId levelId = param0.AsElementId(); //получаем значение исходного параметра
+            Element level = RevitAPI.Document.GetElement(levelId);
+            string levelName = level.Name;
+            levelName = levelName.Replace("_", " ");
+            string[] parts = levelName.Split(new char[] { ' ' }); //делим имя пробелами
+            levelName = parts[0];
+            if (levelName.Contains('.'))
             {
-                string[] parts2 = level.Split('.');
-                level = parts2[0];
+                string[] parts2 = levelName.Split('.');
+                levelName = parts2[0];
             }
             double num = 0;
-            Double.TryParse(level, out num);
+            Double.TryParse(levelName, out num);
             num = num / 0.3048 / 0.3048;
 
             success = false;
@@ -800,11 +526,11 @@ namespace TNovUtilsAR
                 {
                     elem.get_Parameter(param1)?.Set(num);
                     success = true;
-                    Logger.Log("      назначено " + num.ToString(), 2);
+                    Logger.Log("   назначено " + num.ToString(), 2);
                 }
                 catch (Exception ex)
                 {
-                    Logger.Log("   Элемент " + eid + " Ошибка:" + ex.Message, 4);
+                    Logger.Log("Элемент " + eid + " Ошибка:" + ex.Message, 4);
                 }
             }
 

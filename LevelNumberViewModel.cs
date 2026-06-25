@@ -10,6 +10,16 @@ namespace TNovUtilsAR
 {
     public class LevelNumberViewModel : INotifyPropertyChanged
     {
+        private bool _all = false;
+        public bool all
+        {
+            get => _all; set { _all = value; OnPropertyChanged(); }
+        }
+        private bool _selected = true;
+        public bool selected
+        {
+            get => _selected; set { _selected = value; OnPropertyChanged(); }
+        }
         private string _section = "1";
         public string section
         {
