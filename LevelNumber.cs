@@ -413,7 +413,12 @@ namespace TNovUtilsAR
                     foreach(var tNovElem in elemsToWork) //новое: универсальный цикл по всем элементам
                     {
                         Element elem = doc.GetElement(tNovElem.elem.Id);
-                        Logger.Log(elem.Id.IntegerValue.ToString(), 2);
+#if R2022
+                    long idint =  elem.Id.IntegerValue;
+#else
+                        long idint = elem.Id.Value;
+#endif
+                        Logger.Log(idint.ToString(), 2);
                         Parameter param0 = elem.get_Parameter(BuiltInParameter.LEVEL_PARAM); //по умолчанию: Уровень
 
                         if (tNovElem.TNovCategory == "Wall")
@@ -422,24 +427,32 @@ namespace TNovUtilsAR
                             param0 = elem.get_Parameter(BuiltInParameter.ROOM_LEVEL_ID);
                         else if (tNovElem.TNovCategory.Contains("FamilyInstance"))
                             param0 = elem.get_Parameter(BuiltInParameter.SCHEDULE_LEVEL_PARAM);
-                        
-                        //заполнение параметра
-                        if (param0 != null && param0.AsElementId().IntegerValue > 0)
-                        {
-                            SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
-                            PBCount++;
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
 
-                            if (!success) 
-                            { 
-                                failed.Add(elem.Id.ToString()); failscount++;  
+                        //заполнение параметра
+                        if (param0 != null)
+                        {
+#if R2022
+                    long param0idint =  param0.AsElementId().IntegerValue;
+#else
+                            long param0idint = param0.AsElementId().Value;
+#endif
+                            if (param0idint > 0)
+                            {
+                                SetLevelParam(elem.Id, param0, NLevelNumberParamGuid, out bool success);
+                                PBCount++;
+                                this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
+                                this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
+
+                                if (!success)
+                                {
+                                    failed.Add(elem.Id.ToString()); failscount++;
+                                }
                             }
                         }
-                        else 
-                        { 
-                            failed.Add(elem.Id.ToString()); failscount++; 
-                            Logger.Log(elem.Id.ToString() + " - параметр Уровень отсутствует или пуст", 4); 
+                        else
+                        {
+                            failed.Add(elem.Id.ToString()); failscount++;
+                            Logger.Log(elem.Id.ToString() + " - параметр Уровень отсутствует или пуст", 4);
                         }
 
                     }
@@ -542,11 +555,16 @@ namespace TNovUtilsAR
             //получаем хост
             Element host = RevitAPI.Document.GetElement(elem.HostId);
             Parameter param0 = null;
-            if (host.Category.Id.IntegerValue == -2000011)
+#if R2022
+                    long idint =  host.Category.Id.IntegerValue;
+#else
+            long idint = host.Category.Id.Value;
+#endif
+            if (idint == -2000011)
             {
                 param0 = host.get_Parameter(BuiltInParameter.WALL_BASE_CONSTRAINT);
             }
-            else if (host.Category.Id.IntegerValue == -2000120)
+            else if (idint == -2000120)
             {
                 param0 = host.get_Parameter(BuiltInParameter.STAIRS_BASE_LEVEL_PARAM);
             }

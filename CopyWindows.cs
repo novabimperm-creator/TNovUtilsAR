@@ -235,7 +235,12 @@ namespace TNovUtilsAR
                         IsWallFlipped = isFlipped,
                         LinkDocumentPath = linkDoc.PathName
                     });
-                    Logger.Log("   Добавлен элемент "+elem.Id.IntegerValue.ToString(), 2);
+#if R2022
+                    long idint =  elem.Id.IntegerValue;
+#else
+                    long idint = elem.Id.Value;
+#endif
+                    Logger.Log("   Добавлен элемент "+ idint.ToString(), 2);
                 }
             }
 

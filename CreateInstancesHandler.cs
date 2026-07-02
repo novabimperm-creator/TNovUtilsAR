@@ -50,11 +50,19 @@ namespace TNovUtilsAR
             try
             {
                 // Поиск семейства
+#if R2022
                 FamilySymbol targetSymbol = new FilteredElementCollector(doc)
                     .OfClass(typeof(FamilySymbol))
                     .Cast<FamilySymbol>()
                     .FirstOrDefault(fs => fs.Name == "pmN.Отверстие Стена.ПОФ"
                                         && fs.Category.Id.IntegerValue == (int)BuiltInCategory.OST_GenericModel);
+#else
+                FamilySymbol targetSymbol = new FilteredElementCollector(doc)
+                    .OfClass(typeof(FamilySymbol))
+                    .Cast<FamilySymbol>()
+                    .FirstOrDefault(fs => fs.Name == "pmN.Отверстие Стена.ПОФ"
+                                        && fs.Category.Id.Value == (int)BuiltInCategory.OST_GenericModel);
+#endif
                 if (targetSymbol == null)
                 {
                     new InfoWindow280("Семейство 'pmN.Отверстие Стена.ПОФ' не загружено.").ShowDialog();
@@ -143,8 +151,11 @@ namespace TNovUtilsAR
                                 SetParameter(inst, adskHeightParamGuid, item.Height);
                                 SetParameter(inst, adskWidthParamGuid, item.Width);
                                 SetParameter(inst, adskDepthParamGuid, _userDepth);
+#if R2022
                                 SetParameter(inst, BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS, $"Исходный элемент ID: {item.OriginalId.IntegerValue}");
-
+#else
+                                SetParameter(inst, BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS, $"Исходный элемент ID: {item.OriginalId.Value}");
+#endif
                                 // Упрощённое соединение со стенами (только по bounding box)
                                 JoinWithWallsSimple(doc, inst, placementPoint);
 
