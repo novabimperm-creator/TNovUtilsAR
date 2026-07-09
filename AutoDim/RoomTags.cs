@@ -1,13 +1,11 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Architecture;
 using Autodesk.Revit.UI;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
 using TNovCommon;
 using Parameter = Autodesk.Revit.DB.Parameter;
 
@@ -22,12 +20,18 @@ namespace TNovUtilsAR
     public class AutoRoomTags : IExternalCommand
     {
         // Метка сборки. Если её нет в заголовке окна — Revit грузит старый DLL.
-        private const string BUILD = "метки v1";
+        private const string BUILD = "метки v4 (лоджии с коэффициентом)";
 
         // Семейство марки и имена типов
         private const string TAG_FAMILY = "pmN.Марка_Помещение";
         private const string TAG_TYPE_NAME = "Имя";
         private const string TAG_TYPE_AREA = "Площадь";
+        // Тип площади для лоджий/балконов (площадь с коэффициентом).
+        private const string TAG_TYPE_AREA_COEF = "Площадь / Площадь с коэффициентом";
+        private static readonly string[] LOGGIA_KEYS = { "лоджи", "балкон" };
+        // Помещения с этим назначением метятся отдельной маркой «Номер_ВКруге»,
+        // имя и площадь им не ставятся.
+        private const string PURPOSE_PARAM = "Назначение";
         // Параметр площади (для оценки ширины текста марки)
         private const string AREA_PARAM = "N_Площадь.ОкруглСКоэффициентом";
 
@@ -39,44 +43,25 @@ namespace TNovUtilsAR
         // Поиск свободного места
         private const double CORNER_MARGIN_PAPER_MM = 2.0; // отступ от границ помещения
         private const double SEARCH_STEP_PAPER_MM = 2.0;   // шаг сетки поиска
-        private const int SEARCH_MAX_RINGS = 30;           // максимум колец поиска
+        private const int SEARCH_MAX_RINGS = 30;           // максимум колец поиска (марка имени)
+        // Марка площади не должна «улетать» из угла: поиск чистого места ограничен
+        // этим числом колец, дальше марка ставится у угла даже с наложением.
+        private const int CORNER_MAX_RINGS = 8;
 
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
-            #region Исходные
-            DateTime dateTime = DateTime.Now;
-            string TNovVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
-            string DBCommandName = "Метки помещений";
-            //подключение приложения и документа
-            if (RevitAPI.UiApplication == null) { RevitAPI.Initialize(commandData); }
-            UIDocument uidoc = RevitAPI.UiDocument; Document doc = RevitAPI.Document;
-            UIApplication uiApp = RevitAPI.UiApplication; Autodesk.Revit.ApplicationServices.Application rvtApp = uiApp.Application;
-            string docName = doc.Title.ToString(); docName = docName.Replace(",", " ");
-            string userName = rvtApp.Username; userName = userName.Replace(",", "");
-            string docNameUserName = "_" + userName; docName = docName.Replace(docNameUserName, "");
-            docName = docName.Replace(",", "");
-            #endregion
-
-            TNovConfig config = TNovConfigLoad.LoadConfig(DBCommandName, TNovVersion);
-
-            #region Настройки логов
-            // создание log - файла
-            Logger.Initialize(DBCommandName, dateTime, TNovVersion);
-
-            var viewModel0 = new AppVersionViewModel();
-            string jsonpath0 = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "TNovClient/TNovSettings.json");
-            try
-            {
-                viewModel0 = JsonConvert.DeserializeObject<AppVersionViewModel>(File.ReadAllText(jsonpath0));
-            }
-            catch (Exception) { }
-            #endregion
+            UIDocument uidoc = commandData.Application.ActiveUIDocument;
+            Document doc = uidoc.Document;
 
             try
             {
                 View view = doc.ActiveView;
                 var report = new StringBuilder();
                 report.AppendLine($"[{BUILD}]  Вид: {view.Name}, масштаб 1:{view.Scale}");
+                if (RevitAPI.UiApplication == null) RevitAPI.Initialize(commandData);
+                string _ver = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
+                TNovConfigLoad.LoadConfig("Метки помещений", _ver);
+                Logger.Initialize("Метки помещений", DateTime.Now, _ver);
 
                 if (!(view is ViewPlan))
                 {
@@ -87,6 +72,8 @@ namespace TNovUtilsAR
                 // ----- Типы марок -----
                 RoomTagType nameType = FindTagType(doc, TAG_FAMILY, TAG_TYPE_NAME);
                 RoomTagType areaType = FindTagType(doc, TAG_FAMILY, TAG_TYPE_AREA);
+                // площадь с коэффициентом для лоджий (если нет — обычная площадь)
+                RoomTagType loggiaAreaType = FindTagType(doc, TAG_FAMILY, TAG_TYPE_AREA_COEF) ?? areaType;
                 if (nameType == null || areaType == null)
                 {
                     TaskDialog.Show($"Метки помещений [{BUILD}]",
@@ -121,7 +108,7 @@ namespace TNovUtilsAR
                         tagged.Add((t.Room.Id, t.RoomTagType.Id));
                 }
 
-                int namePlaced = 0, areaPlaced = 0, nameOverlap = 0, areaOverlap = 0, skipped = 0;
+                int namePlaced = 0, areaPlaced = 0, nameOverlap = 0, areaOverlap = 0, skipped = 0, mopSkipped = 0;
 
                 using (Transaction tx = new Transaction(doc, "Метки помещений"))
                 {
@@ -129,6 +116,9 @@ namespace TNovUtilsAR
 
                     foreach (Room room in rooms)
                     {
+                        // МОП/технические метятся отдельной маркой «Номер_ВКруге»
+                        if (IsMop(room)) { mopSkipped++; continue; }
+
                         double z = ((LocationPoint)room.Location).Point.Z + 0.05;
                         BoundingBoxXYZ bb = room.get_BoundingBox(view);
                         if (bb == null) { skipped++; continue; }
@@ -153,13 +143,15 @@ namespace TNovUtilsAR
                         else skipped++;
 
                         // --- марка ПЛОЩАДИ: правый нижний угол ---
-                        if (!tagged.Contains((room.Id, areaType.Id)))
+                        // лоджии/балконы — площадь с коэффициентом, остальные — обычная
+                        RoomTagType useAreaType = IsLoggia(room) ? loggiaAreaType : areaType;
+                        if (!tagged.Contains((room.Id, useAreaType.Id)))
                         {
                             string areaText = AreaText(room);
                             Rect2 size = TagSize(view, Math.Max(areaText.Length, 3));
                             bool clean;
                             XYZ pt = FindSpotCorner(room, bb, size, z, view, obstacles, out clean);
-                            RoomTag tag = PlaceTag(doc, view, room, pt, areaType);
+                            RoomTag tag = PlaceTag(doc, view, room, pt, useAreaType);
                             if (tag != null)
                             {
                                 areaPlaced++;
@@ -174,8 +166,8 @@ namespace TNovUtilsAR
                 }
 
                 report.AppendLine($"\nИТОГО: марок имени {namePlaced} (с наложением {nameOverlap}), " +
-                    $"марок площади {areaPlaced} (с наложением {areaOverlap}), пропущено (уже есть) {skipped}");
-                Logger.Log($"Вид: {view.Name}, имя {namePlaced}, площадь {areaPlaced}, пропущено {skipped}", 1);
+                    $"марок площади {areaPlaced} (с наложением {areaOverlap}), пропущено (уже есть) {skipped}, " +
+                    $"МОП/технических пропущено {mopSkipped}");
                 TaskDialog.Show($"Метки помещений [{BUILD}]", report.ToString());
                 return Result.Succeeded;
             }
@@ -185,7 +177,7 @@ namespace TNovUtilsAR
             }
             catch (Exception ex)
             {
-                Logger.Log("Ошибка: " + ex.Message, 1);
+                Logger.Log("Ошибка: " + ex.Message, 4);
                 message = ex.Message;
                 return Result.Failed;
             }
@@ -248,7 +240,7 @@ namespace TNovUtilsAR
             double y0 = bb.Min.Y + margin + size.H / 2;
             XYZ firstInside = null;
 
-            for (int ring = 0; ring <= SEARCH_MAX_RINGS; ring++)
+            for (int ring = 0; ring <= CORNER_MAX_RINGS; ring++)
             {
                 // только влево (dx≥0) и вверх (dy≥0) от угла
                 for (int dx = 0; dx <= ring; dx++)
@@ -396,6 +388,28 @@ namespace TNovUtilsAR
                 .OfCategory(BuiltInCategory.OST_RoomTags)
                 .OfType<RoomTagType>()
                 .FirstOrDefault(t => t.FamilyName == family && t.Name == typeName);
+        }
+
+        /// <summary>Назначение помещения = «МОП» или «Техническое» (метятся отдельно).</summary>
+        private static bool IsMop(Room room)
+        {
+            Parameter p = room.LookupParameter(PURPOSE_PARAM);
+            string s = (p != null && p.HasValue ? (p.AsString() ?? p.AsValueString()) : "") ?? "";
+            s = s.Trim();
+            if (s.Length == 0) return false;
+            return s.Equals("МОП", StringComparison.OrdinalIgnoreCase)
+                || s.IndexOf("техническ", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        /// <summary>Помещение — лоджия/балкон (по имени): площадь с коэффициентом.</summary>
+        private static bool IsLoggia(Room room)
+        {
+            string n = (room.get_Parameter(BuiltInParameter.ROOM_NAME)?.AsString() ?? "")
+                .ToLowerInvariant();
+            if (n.Length == 0) return false;
+            foreach (var k in LOGGIA_KEYS)
+                if (n.IndexOf(k, StringComparison.Ordinal) >= 0) return true;
+            return false;
         }
 
         /// <summary>Миллиметры на бумаге → координаты модели (с учётом масштаба вида).</summary>

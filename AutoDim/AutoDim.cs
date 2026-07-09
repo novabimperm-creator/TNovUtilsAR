@@ -1,26 +1,20 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
 using TNovCommon;
 using Parameter = Autodesk.Revit.DB.Parameter;
 
 namespace TNovUtilsAR
 {
-    /// <summary>
-    /// Авторазмеры: цепочки размеров по осям (+ общий размер) и цепочки проёмов
-    /// по наружным фасадным стенам на планах, фасадах и разрезах.
-    /// </summary>
     [Transaction(TransactionMode.Manual)]
     public class AutoDim : IExternalCommand
     {
         // Метка сборки. Если её нет в заголовке окна — Revit грузит старый DLL.
-        private const string BUILD = "build v18 (диагностика 3)";
+        private const string BUILD = "build v21 (замер плоскостей с откатом)";
 
         // Отступы цепочек в МИЛЛИМЕТРАХ НА БУМАГЕ (умножаются на масштаб вида).
         private const double OPENING_CHAIN_PAPER_MM = 8.0;   // цепочка проёмов от стены
@@ -34,102 +28,74 @@ namespace TNovUtilsAR
         // «внутри лоджии» и не размеряется.
         private const double LOGGIA_RECESS_MM = 200.0;
 
-        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        public Result Execute(
+            ExternalCommandData commandData,
+            ref string message,
+            ElementSet elements)
         {
-            #region Исходные
-            DateTime dateTime = DateTime.Now;
-            string TNovVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
-            string DBCommandName = "Авторазмеры";
-            //подключение приложения и документа
-            if (RevitAPI.UiApplication == null) { RevitAPI.Initialize(commandData); }
-            UIDocument uidoc = RevitAPI.UiDocument; Document doc = RevitAPI.Document;
-            UIApplication uiApp = RevitAPI.UiApplication; Autodesk.Revit.ApplicationServices.Application rvtApp = uiApp.Application;
-            string docName = doc.Title.ToString(); docName = docName.Replace(",", " ");
-            string userName = rvtApp.Username; userName = userName.Replace(",", "");
-            string docNameUserName = "_" + userName; docName = docName.Replace(docNameUserName, "");
-            docName = docName.Replace(",", "");
-            #endregion
+            UIApplication uiApp = commandData.Application;
+            UIDocument uiDoc = uiApp.ActiveUIDocument;
+            Document doc = uiDoc.Document;
+            View view = doc.ActiveView;
 
-            TNovConfig config = TNovConfigLoad.LoadConfig(DBCommandName, TNovVersion);
+            var report = new StringBuilder();
+            report.AppendLine($"[{BUILD}]  Вид: {view.Name} ({view.GetType().Name}), масштаб 1:{view.Scale}");
+            if (RevitAPI.UiApplication == null) RevitAPI.Initialize(commandData);
+            string _ver = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            TNovConfigLoad.LoadConfig("Авторазмеры", _ver);
+            Logger.Initialize("Авторазмеры", DateTime.Now, _ver);
 
-            #region Настройки логов
-            // создание log - файла
-            Logger.Initialize(DBCommandName, dateTime, TNovVersion);
-
-            var viewModel0 = new AppVersionViewModel();
-            string jsonpath0 = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "TNovClient/TNovSettings.json");
-            try
+            if (!(view is ViewPlan) && !(view is ViewSection))
             {
-                viewModel0 = JsonConvert.DeserializeObject<AppVersionViewModel>(File.ReadAllText(jsonpath0));
-            }
-            catch (Exception) { }
-            #endregion
-
-            try
-            {
-                View view = doc.ActiveView;
-
-                var report = new StringBuilder();
-                report.AppendLine($"[{BUILD}]  Вид: {view.Name} ({view.GetType().Name}), масштаб 1:{view.Scale}");
-
-                if (!(view is ViewPlan) && !(view is ViewSection))
-                {
-                    TaskDialog.Show($"Авторазмеры [{BUILD}]", "Команда работает только на планах, фасадах и разрезах.");
-                    return Result.Failed;
-                }
-
-                // Оси видимые в виде (если пусто — по всему проекту)
-                List<Grid> allGrids = new FilteredElementCollector(doc, view.Id)
-                    .OfClass(typeof(Grid)).Cast<Grid>().ToList();
-                if (allGrids.Count == 0)
-                    allGrids = new FilteredElementCollector(doc)
-                        .OfClass(typeof(Grid)).Cast<Grid>().ToList();
-                report.AppendLine($"Осей: {allGrids.Count}");
-
-                int gridDims = 0, overallDims = 0, openingDims = 0;
-
-                using (Transaction tx = new Transaction(doc, "Авторазмеры"))
-                {
-                    tx.Start();
-
-                    // ----- ОСИ + ОБЩИЙ РАЗМЕР -----
-                    if (allGrids.Count >= 2)
-                    {
-                        var groups = GroupGridsByDirection(allGrids);
-                        report.AppendLine($"Групп параллельных осей: {groups.Count}");
-                        for (int i = 0; i < groups.Count; i++)
-                        {
-                            if (groups[i].Count < 2) continue;
-                            string st;
-                            bool chain, overall;
-                            CreateGridChain(doc, view, groups[i], out chain, out overall, out st);
-                            if (chain) gridDims++;
-                            if (overall) overallDims++;
-                            report.AppendLine($"  Группа {i + 1} ({groups[i].Count} осей): {st}");
-                        }
-                    }
-
-                    // ----- ПРОЁМЫ -----
-                    openingDims = CreateOpeningDimensions(doc, view, allGrids, report);
-
-                    tx.Commit();
-                }
-
-                report.AppendLine($"\nИТОГО: цепочек осей {gridDims}, общих размеров {overallDims}, цепочек проёмов {openingDims}");
-                Logger.Log($"Вид: {view.Name}, цепочек осей {gridDims}, общих размеров {overallDims}, цепочек проёмов {openingDims}", 1);
-                TaskDialog.Show($"Авторазмеры [{BUILD}]", report.ToString());
-                return Result.Succeeded;
-            }
-            catch (Autodesk.Revit.Exceptions.OperationCanceledException)
-            {
-                return Result.Cancelled;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log("Ошибка: " + ex.Message, 1);
-                message = ex.Message;
+                TaskDialog.Show($"Авторазмеры [{BUILD}]", "Команда работает только на планах, фасадах и разрезах.");
                 return Result.Failed;
             }
+
+            // Оси видимые в виде (если пусто — по всему проекту)
+            List<Grid> allGrids = new FilteredElementCollector(doc, view.Id)
+                .OfClass(typeof(Grid)).Cast<Grid>().ToList();
+            if (allGrids.Count == 0)
+                allGrids = new FilteredElementCollector(doc)
+                    .OfClass(typeof(Grid)).Cast<Grid>().ToList();
+            report.AppendLine($"Осей: {allGrids.Count}");
+
+            int gridDims = 0, overallDims = 0, openingDims = 0;
+
+            using (Transaction tx = new Transaction(doc, "Авторазмеры"))
+            {
+                tx.Start();
+
+                // ----- ОСИ + ОБЩИЙ РАЗМЕР -----
+                if (allGrids.Count >= 2)
+                {
+                    var groups = GroupGridsByDirection(allGrids);
+                    report.AppendLine($"Групп параллельных осей: {groups.Count}");
+                    for (int i = 0; i < groups.Count; i++)
+                    {
+                        if (groups[i].Count < 2) continue;
+                        string st;
+                        bool chain, overall;
+                        CreateGridChain(doc, view, groups[i], out chain, out overall, out st);
+                        if (chain) gridDims++;
+                        if (overall) overallDims++;
+                        report.AppendLine($"  Группа {i + 1} ({groups[i].Count} осей): {st}");
+                    }
+                }
+
+                // ----- ПРОЁМЫ -----
+                openingDims = CreateOpeningDimensions(doc, view, allGrids, report);
+
+                // если какой-то размер всё же вышел с некорректной ссылкой — удалить
+                // именно его, а не блокировать всю команду диалогом Revit
+                FailureHandlingOptions fho = tx.GetFailureHandlingOptions();
+                fho.SetFailuresPreprocessor(new DimFailureSwallower());
+                fho.SetClearAfterRollback(true);
+                tx.Commit(fho);
+            }
+
+            report.AppendLine($"\nИТОГО: цепочек осей {gridDims}, общих размеров {overallDims}, цепочек проёмов {openingDims}");
+            TaskDialog.Show($"Авторазмеры [{BUILD}]", report.ToString());
+            return Result.Succeeded;
         }
 
         // =====================================================================
@@ -311,14 +277,13 @@ namespace TNovUtilsAR
             Options opt = GeomOptions(view);
             double tol = doc.Application.ShortCurveTolerance;
 
-            ElementId windowsCatId = new ElementId(BuiltInCategory.OST_Windows);
-            ElementId doorsCatId = new ElementId(BuiltInCategory.OST_Doors);
             var openings = new FilteredElementCollector(doc, view.Id)
                 .WhereElementIsNotElementType()
                 .OfClass(typeof(FamilyInstance))
                 .Cast<FamilyInstance>()
                 .Where(fi => fi.Category != null &&
-                    (fi.Category.Id == windowsCatId || fi.Category.Id == doorsCatId))
+                    (fi.Category.Id == new ElementId(BuiltInCategory.OST_Windows) ||
+                     fi.Category.Id == new ElementId(BuiltInCategory.OST_Doors)))
                 .Where(fi => fi.Host is Wall)
                 .ToList();
 
@@ -493,18 +458,66 @@ namespace TNovUtilsAR
                     if (lFb != null) itemsFb.Add((lFb, tc - halfW));
                     if (rFb != null) itemsFb.Add((rFb, tc + halfW));
 
-                    // основной: грани блока, ближайшие к ±«Ширина.Наружная»/2 —
-                    // размер = наружная ширина проёма (с четвертями)
+                    // основной: грани, ближайшие к ±«Ширина.Наружная»/2 — размер =
+                    // наружная ширина проёма (с четвертями). Откосы проёма в СТЕНЕ
+                    // проверяются первыми: грань четверти лежит ровно на наружной
+                    // ширине, а грани оконного блока (рама) могут быть смещены внутрь.
                     double targetHalf = GetOpeningOuterWidth(op) / 2.0;
                     if (targetHalf <= 0) targetHalf = halfW;
+                    Reference lref = null, rref = null;
+                    double lt = 0, rt = 0, ld = double.MaxValue, rd = double.MaxValue;
+                    double near = targetHalf + UnitUtils.ConvertToInternalUnits(500.0, UnitTypeId.Millimeters);
+                    foreach (var f in faces)
+                        if (Math.Abs(f.t - tc) < near)
+                            ConsiderSideFace(f.r, f.t, tc, targetHalf,
+                                ref lref, ref ld, ref lt, ref rref, ref rd, ref rt);
                     GetOpeningSideRefs(op, dir, origin, tc, targetHalf,
-                        out Reference lref, out double lt, out Reference rref, out double rt);
-                    if (lref != null && rref != null)
+                        ref lref, ref ld, ref lt, ref rref, ref rd, ref rt);
+
+                    // именованные опорные плоскости семейства: у pmN-окон «Ширина.Наружная»
+                    // задаётся опорными плоскостями, у которых НЕТ граней в геометрии.
+                    // Позиция каждой плоскости измеряется временным размером от торцов стены.
+                    Reference wMinRef = null, wMaxRef = null;
+                    double wMinT = double.MaxValue, wMaxT = double.MinValue;
+                    foreach (var f in faces)
+                    {
+                        if (f.t < wMinT) { wMinT = f.t; wMinRef = f.r; }
+                        if (f.t > wMaxT) { wMaxT = f.t; wMaxRef = f.r; }
+                    }
+                    var namedDiag = new List<int>();
+                    if (wMinRef != null && wMaxRef != null && wMaxT - wMinT > tol)
+                    {
+                        var namedRefs = new List<Reference>();
+                        foreach (var refType in new[] {
+                            FamilyInstanceReferenceType.Left,
+                            FamilyInstanceReferenceType.Right,
+                            FamilyInstanceReferenceType.StrongReference,
+                            FamilyInstanceReferenceType.WeakReference })
+                        {
+                            IList<Reference> rl = op.GetReferences(refType);
+                            if (rl != null) namedRefs.AddRange(rl);
+                        }
+                        foreach (Reference nr in namedRefs)
+                        {
+                            double? tp = MeasureRefPosition(doc, view, dir, origin, exterior,
+                                wMinRef, wMinT, wMaxRef, wMaxT, nr);
+                            if (tp == null) continue;
+                            if (Math.Abs(tp.Value - tc) >= near) continue;
+                            namedDiag.Add((int)Math.Round(UnitUtils.ConvertFromInternalUnits(
+                                tp.Value - tc, UnitTypeId.Millimeters)));
+                            ConsiderSideFace(nr, tp.Value, tc, targetHalf,
+                                ref lref, ref ld, ref lt, ref rref, ref rd, ref rt);
+                        }
+                        namedDiag.Sort();
+                    }
+
+                    double accept = UnitUtils.ConvertToInternalUnits(120.0, UnitTypeId.Millimeters);
+                    if (lref != null && rref != null && ld <= accept && rd <= accept)
                     {
                         items.Add((lref, lt));
                         items.Add((rref, rt));
                     }
-                    else // граней с ссылками нет — используем Left/Right и в основном списке
+                    else // подходящих граней нет — используем Left/Right и в основном списке
                     {
                         if (lFb != null) items.Add((lFb, tc - halfW));
                         if (rFb != null) items.Add((rFb, tc + halfW));
@@ -517,7 +530,12 @@ namespace TNovUtilsAR
                         .Where(d => Math.Abs(d) < UnitUtils.ConvertToInternalUnits(1600, UnitTypeId.Millimeters))
                         .OrderBy(d => d)
                         .Select(d => (int)Math.Round(UnitUtils.ConvertFromInternalUnits(d, UnitTypeId.Millimeters)));
-                    report.AppendLine($"    проём(цель ±{tgt}): сем[{string.Join(" ", famF)}] стена[{string.Join(" ", wallF)}]");
+                    string chosen = (lref != null && rref != null && ld <= accept && rd <= accept)
+                        ? $"{(int)Math.Round(UnitUtils.ConvertFromInternalUnits(lt - tc, UnitTypeId.Millimeters))} " +
+                          $"{(int)Math.Round(UnitUtils.ConvertFromInternalUnits(rt - tc, UnitTypeId.Millimeters))}"
+                        : "нет";
+                    report.AppendLine($"    проём(цель ±{tgt}): сем[{string.Join(" ", famF)}] " +
+                        $"стена[{string.Join(" ", wallF)}] рефы[{string.Join(" ", namedDiag)}] выбр[{chosen}]");
                 }
             }
 
@@ -576,26 +594,19 @@ namespace TNovUtilsAR
         }
 
         /// <summary>
-        /// Ссылки на боковые грани геометрии оконного блока (нормаль вдоль стены),
-        /// БЛИЖАЙШИЕ к целевой полуширине targetHalf от центра — даёт размер по
-        /// параметру «Ширина.Наружная» (наружный проём с четвертями).
+        /// Дополняет лучшие боковые ссылки гранями геометрии оконного блока
+        /// (нормаль вдоль стены), ближайшими к целевой полуширине targetHalf.
         /// Ссылки берутся из геометрии символа (в геометрии экземпляра они null).
         /// </summary>
         private static void GetOpeningSideRefs(
             FamilyInstance op, XYZ dir, XYZ origin, double tc, double targetHalf,
-            out Reference lref, out double lt, out Reference rref, out double rt)
+            ref Reference lref, ref double bestLd, ref double bestLt,
+            ref Reference rref, ref double bestRd, ref double bestRt)
         {
-            lref = null; rref = null;
-            lt = 0; rt = 0;
-            // грань засчитывается, если отстоит от целевой позиции не дальше этого
-            double accept = UnitUtils.ConvertToInternalUnits(120.0, UnitTypeId.Millimeters);
-
             var geOpt = new Options { ComputeReferences = true, DetailLevel = ViewDetailLevel.Fine };
             GeometryElement ge = op.get_Geometry(geOpt);
             if (ge == null) return;
 
-            double bestLd = double.MaxValue, bestRd = double.MaxValue;
-            double bestLt = 0, bestRt = 0;
             foreach (GeometryObject go in ge)
             {
                 if (go is Solid s0)
@@ -611,12 +622,29 @@ namespace TNovUtilsAR
                                 ref lref, ref bestLd, ref bestLt, ref rref, ref bestRd, ref bestRt);
                 }
             }
-            if (lref == null || rref == null || bestLd > accept || bestRd > accept)
+        }
+
+        /// <summary>
+        /// Учитывает грань-кандидата (ссылка r на позиции t вдоль стены) как левый
+        /// или правый откос проёма с центром tc: побеждает грань, ближайшая к
+        /// целевой полуширине targetHalf. При равном расстоянии остаётся ранее
+        /// найденная (откосы стены сканируются первыми и имеют приоритет).
+        /// </summary>
+        private static void ConsiderSideFace(
+            Reference r, double t, double tc, double targetHalf,
+            ref Reference lref, ref double bestLd, ref double bestLt,
+            ref Reference rref, ref double bestRd, ref double bestRt)
+        {
+            if (t < tc)
             {
-                lref = null; rref = null;
-                return;
+                double d = Math.Abs((tc - t) - targetHalf);
+                if (d < bestLd) { bestLd = d; bestLt = t; lref = r; }
             }
-            lt = bestLt; rt = bestRt;
+            else
+            {
+                double d = Math.Abs((t - tc) - targetHalf);
+                if (d < bestRd) { bestRd = d; bestRt = t; rref = r; }
+            }
         }
 
         /// <summary>ДИАГНОСТИКА: позиции всех боковых граней блока с ссылками (мм от центра).</summary>
@@ -667,16 +695,52 @@ namespace TNovUtilsAR
                 XYZ n = tr.OfVector(pf.FaceNormal);
                 if (Math.Abs(n.Normalize().DotProduct(dir)) < 0.99) continue;
                 double t = dir.DotProduct(tr.OfPoint(pf.Origin) - origin);
-                if (t < tc)
+                ConsiderSideFace(pf.Reference, t, tc, targetHalf,
+                    ref lref, ref bestLd, ref bestLt, ref rref, ref bestRd, ref bestRt);
+            }
+        }
+
+        /// <summary>
+        /// Позиция ссылки (опорной плоскости семейства) вдоль стены. Замер идёт во
+        /// ВЛОЖЕННОЙ транзакции с откатом: создаётся временный размер «торец стены —
+        /// ссылка — торец стены», из его сегмента читается расстояние, затем
+        /// SubTransaction откатывается. Благодаря откату размер физически не остаётся
+        /// в модели, и переданные ссылки не «портятся» для повторного использования
+        /// в настоящей цепочке (иначе Revit ругается «опорные элементы некорректны»).
+        /// null — если размер не строится (плоскость не поперёк стены и т.п.).
+        /// </summary>
+        private static double? MeasureRefPosition(
+            Document doc, View view, XYZ dir, XYZ origin, XYZ exterior,
+            Reference baseMin, double baseMinT, Reference baseMax, double baseMaxT,
+            Reference target)
+        {
+            XYZ basePt = origin + exterior * OffsetModel(view, 40.0);
+            XYZ start = basePt + baseMinT * dir;
+            XYZ end   = basePt + baseMaxT * dir;
+            if (start.DistanceTo(end) < doc.Application.ShortCurveTolerance) return null;
+
+            using (SubTransaction st = new SubTransaction(doc))
+            {
+                st.Start();
+                double? result = null;
+                try
                 {
-                    double d = Math.Abs((tc - t) - targetHalf);
-                    if (d < bestLd) { bestLd = d; bestLt = t; lref = pf.Reference; }
+                    Line line = Line.CreateBound(start, end);
+                    ReferenceArray ra = new ReferenceArray();
+                    ra.Append(baseMin);
+                    ra.Append(target);
+                    ra.Append(baseMax);
+                    Dimension dim = doc.Create.NewDimension(view, line, ra);
+                    if (dim != null && dim.NumberOfSegments == 2)
+                    {
+                        DimensionSegment seg = dim.Segments.get_Item(0);
+                        if (seg != null && seg.Value.HasValue)
+                            result = baseMinT + seg.Value.Value;
+                    }
                 }
-                else
-                {
-                    double d = Math.Abs((t - tc) - targetHalf);
-                    if (d < bestRd) { bestRd = d; bestRt = t; rref = pf.Reference; }
-                }
+                catch { result = null; }
+                st.RollBack();
+                return result;
             }
         }
 
@@ -751,6 +815,42 @@ namespace TNovUtilsAR
         {
             double scale = view.Scale <= 0 ? 100 : view.Scale;
             return UnitUtils.ConvertToInternalUnits(paperMM * scale, UnitTypeId.Millimeters);
+        }
+    }
+
+    /// <summary>
+    /// Гасит отказы при коммите: предупреждения удаляются, ошибки «некорректная
+    /// ссылка размера» разрешаются удалением самого проблемного размера — команда
+    /// завершается без блокирующего диалога Revit, остальные размеры сохраняются.
+    /// </summary>
+    public class DimFailureSwallower : IFailuresPreprocessor
+    {
+        public FailureProcessingResult PreprocessFailures(FailuresAccessor fa)
+        {
+            bool acted = false;
+            foreach (FailureMessageAccessor fm in fa.GetFailureMessages())
+            {
+                if (fm.GetSeverity() == FailureSeverity.Warning)
+                {
+                    fa.DeleteWarning(fm);
+                    acted = true;
+                    continue;
+                }
+                // ошибка: удаляем породившие её элементы (наши временные/битые размеры)
+                ICollection<ElementId> ids = fm.GetFailingElementIds();
+                if (ids != null && ids.Count > 0)
+                {
+                    fa.DeleteElements(new List<ElementId>(ids));
+                    acted = true;
+                }
+                else
+                {
+                    fa.ResolveFailure(fm);
+                    acted = true;
+                }
+            }
+            return acted ? FailureProcessingResult.ProceedWithCommit
+                         : FailureProcessingResult.Continue;
         }
     }
 }
