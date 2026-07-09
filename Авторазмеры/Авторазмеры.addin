@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Command">
+    <Name>Авторазмеры</Name>
+    <Assembly>Авторазмеры.dll</Assembly>
+    <AddInId>5060de6b-88bc-41e5-82fa-6f02264abc72</AddInId>
+    <FullClassName>GridDimensionTool.AutoDimensionGridsCommand</FullClassName>
+    <Text>Авторазмеры</Text>
+    <Description>Автоматическая расстановка размеров: цепочки осей + общий размер, цепочки проёмов по наружным фасадам (build v19).</Description>
+    <VisibilityMode>AlwaysVisible</VisibilityMode>
+    <VendorId>PupavLupe</VendorId>
+    <VendorDescription>https://github.com/PupavLupe</VendorDescription>
+  </AddIn>
+  <AddIn Type="Command">
+    <Name>Метки помещений</Name>
+    <Assembly>Авторазмеры.dll</Assembly>
+    <AddInId>9b3a5fd1-2c74-4e0b-a1c8-46d19f3f7b21</AddInId>
+    <FullClassName>GridDimensionTool.AutoRoomTagsCommand</FullClassName>
+    <Text>Метки помещений</Text>
+    <Description>Марки имени (по центру помещения) и площади (в правом нижнем углу) семейства pmN.Марка_Помещение с поиском свободного места.</Description>
+    <VisibilityMode>AlwaysVisible</VisibilityMode>
+    <VendorId>PupavLupe</VendorId>
+    <VendorDescription>https://github.com/PupavLupe</VendorDescription>
+  </AddIn>
+  <AddIn Type="Command">
+    <Name>Марки квартир</Name>
+    <Assembly>Авторазмеры.dll</Assembly>
+    <AddInId>7af8d62c-cc0c-40d5-a26e-a7124d118841</AddInId>
+    <FullClassName>GridDimensionTool.AutoApartmentTagsCommand</FullClassName>
+    <Text>Марки квартир</Text>
+    <Description>Марка квартиры (pmN.Марка_Квартира_Талан) — одна на квартиру (группировка по «Номер квартиры»), с выносом к границе здания и выстраиванием в горизонтальные ряды.</Description>
+    <VisibilityMode>AlwaysVisible</VisibilityMode>
+    <VendorId>PupavLupe</VendorId>
+    <VendorDescription>https://github.com/PupavLupe</VendorDescription>
+  </AddIn>
+  <AddIn Type="Command">
+    <Name>Марки окон</Name>
+    <Assembly>Авторазмеры.dll</Assembly>
+    <AddInId>7a0448d3-1cce-44de-94fc-187584ad39ed</AddInId>
+    <FullClassName>GridDimensionTool.AutoWindowTagsCommand</FullClassName>
+    <Text>Марки окон</Text>
+    <Description>Марка окна (pmN.Марка_Окно, параметр «Маркировка типоразмера») на каждое окно: зазор 500 мм от окна, поворот под ориентацию окна.</Description>
+    <VisibilityMode>AlwaysVisible</VisibilityMode>
+    <VendorId>PupavLupe</VendorId>
+    <VendorDescription>https://github.com/PupavLupe</VendorDescription>
+  </AddIn>
+  <AddIn Type="Command">
+    <Name>Марки дверей</Name>
+    <Assembly>Авторазмеры.dll</Assembly>
+    <AddInId>b9eb35c8-0e37-46c7-b726-ff9a9da209da</AddInId>
+    <FullClassName>GridDimensionTool.AutoDoorTagsCommand</FullClassName>
+    <Text>Марки дверей</Text>
+    <Description>Марка двери (pmN.Марка_Дверь, тип «Маркировка типоразмера_План») на каждую дверь — внутреннюю и наружную.</Description>
+    <VisibilityMode>AlwaysVisible</VisibilityMode>
+    <VendorId>PupavLupe</VendorId>
+    <VendorDescription>https://github.com/PupavLupe</VendorDescription>
+  </AddIn>
+  <AddIn Type="Command">
+    <Name>Марки МОП</Name>
+    <Assembly>Авторазмеры.dll</Assembly>
+    <AddInId>4fc26f65-f2c3-40b7-9cec-0b631048e588</AddInId>
+    <FullClassName>GridDimensionTool.AutoMopTagsCommand</FullClassName>
+    <Text>Марки МОП</Text>
+    <Description>Марка pmN.Марка_Помещение (тип «Номер_ВКруге») для помещений с назначением «МОП»/«Техническое»; номер читается из параметра «Номер».</Description>
+    <VisibilityMode>AlwaysVisible</VisibilityMode>
+    <VendorId>PupavLupe</VendorId>
+    <VendorDescription>https://github.com/PupavLupe</VendorDescription>
+  </AddIn>
+  <AddIn Type="Command">
+    <Name>Панель функций</Name>
+    <Assembly>Авторазмеры.dll</Assembly>
+    <AddInId>60c513e9-03fc-4cea-b5fe-11fad91fccc6</AddInId>
+    <FullClassName>GridDimensionTool.PluginPanelCommand</FullClassName>
+    <Text>Панель функций</Text>
+    <Description>WPF-панель плагина с выбором функций: авторазмеры и марки (помещения, квартиры, окна, двери).</Description>
+    <VisibilityMode>AlwaysVisible</VisibilityMode>
+    <VendorId>PupavLupe</VendorId>
+    <VendorDescription>https://github.com/PupavLupe</VendorDescription>
+  </AddIn>
+  <AddIn Type="Application">
+    <Name>Авторазмеры — лента</Name>
+    <Assembly>Авторазмеры.dll</Assembly>
+    <AddInId>d7c22c59-b392-4faa-bc30-345247edcdcd</AddInId>
+    <FullClassName>GridDimensionTool.AppRibbon</FullClassName>
+    <VendorId>PupavLupe</VendorId>
+    <VendorDescription>https://github.com/PupavLupe</VendorDescription>
+  </AddIn>
+</RevitAddIns>

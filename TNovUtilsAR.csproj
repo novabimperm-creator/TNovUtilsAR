@@ -14,4 +14,11 @@
     <ProjectReference Include="..\TNovCommon\TNovCommon.csproj" Private="false" />
   </ItemGroup>
 
+  <!-- Самодостаточный проект «Авторазмеры» (своя лента + WPF-панель, namespace
+       GridDimensionTool) лежит в репозитории отдельным проектом и НЕ компилируется
+       в составе TNovUtilsAR (у него свой Logger/WPF и другой namespace). -->
+  <ItemGroup>
+    <Compile Remove="Авторазмеры\**\*.cs" />
+  </ItemGroup>
+
 </Project>
