@@ -7,7 +7,6 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Architecture;
 using Autodesk.Revit.UI;
 using TNovCommon;
-using Parameter = Autodesk.Revit.DB.Parameter;
 
 namespace TNovUtilsAR
 {
@@ -17,7 +16,7 @@ namespace TNovUtilsAR
     /// мебель, сантехнику, двери, другие марки и размеры на плане.
     /// </summary>
     [Transaction(TransactionMode.Manual)]
-    public class AutoRoomTags : IExternalCommand
+    public class AutoRoomTagsCommand : IExternalCommand
     {
         // Метка сборки. Если её нет в заголовке окна — Revit грузит старый DLL.
         private const string BUILD = "метки v4 (лоджии с коэффициентом)";
@@ -59,13 +58,11 @@ namespace TNovUtilsAR
                 var report = new StringBuilder();
                 report.AppendLine($"[{BUILD}]  Вид: {view.Name}, масштаб 1:{view.Scale}");
                 if (RevitAPI.UiApplication == null) RevitAPI.Initialize(commandData);
-                string _ver = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
-                TNovConfigLoad.LoadConfig("Метки помещений", _ver);
-                Logger.Initialize("Метки помещений", DateTime.Now, _ver);
+                Logger.Initialize("Метки помещений", DateTime.Now, BUILD);
 
                 if (!(view is ViewPlan))
                 {
-                    TaskDialog.Show($"Метки помещений [{BUILD}]", "Команда работает только на планах.");
+                    PluginReport.Show($"Метки помещений [{BUILD}]", "Команда работает только на планах.");
                     return Result.Failed;
                 }
 
@@ -76,7 +73,7 @@ namespace TNovUtilsAR
                 RoomTagType loggiaAreaType = FindTagType(doc, TAG_FAMILY, TAG_TYPE_AREA_COEF) ?? areaType;
                 if (nameType == null || areaType == null)
                 {
-                    TaskDialog.Show($"Метки помещений [{BUILD}]",
+                    PluginReport.Show($"Метки помещений [{BUILD}]",
                         $"Не найдено семейство марки \"{TAG_FAMILY}\" с типами \"{TAG_TYPE_NAME}\" и \"{TAG_TYPE_AREA}\".\n" +
                         "Загрузите семейство в проект и повторите.");
                     return Result.Failed;
@@ -92,7 +89,7 @@ namespace TNovUtilsAR
                 report.AppendLine($"Помещений в виде: {rooms.Count}");
                 if (rooms.Count == 0)
                 {
-                    TaskDialog.Show($"Метки помещений [{BUILD}]", report.ToString());
+                    PluginReport.Show($"Метки помещений [{BUILD}]", report.ToString());
                     return Result.Succeeded;
                 }
 
@@ -168,7 +165,7 @@ namespace TNovUtilsAR
                 report.AppendLine($"\nИТОГО: марок имени {namePlaced} (с наложением {nameOverlap}), " +
                     $"марок площади {areaPlaced} (с наложением {areaOverlap}), пропущено (уже есть) {skipped}, " +
                     $"МОП/технических пропущено {mopSkipped}");
-                TaskDialog.Show($"Метки помещений [{BUILD}]", report.ToString());
+                PluginReport.Show($"Метки помещений [{BUILD}]", report.ToString());
                 return Result.Succeeded;
             }
             catch (Autodesk.Revit.Exceptions.OperationCanceledException)

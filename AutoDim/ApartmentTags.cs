@@ -7,7 +7,6 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Architecture;
 using Autodesk.Revit.UI;
 using TNovCommon;
-using Parameter = Autodesk.Revit.DB.Parameter;
 
 namespace TNovUtilsAR
 {
@@ -18,7 +17,7 @@ namespace TNovUtilsAR
     /// границе здания и выстраиваются в горизонтальные ряды (общая координата Y).
     /// </summary>
     [Transaction(TransactionMode.Manual)]
-    public class AutoApartmentTags : IExternalCommand
+    public class AutoApartmentTagsCommand : IExternalCommand
     {
         // Метка сборки. Если её нет в заголовке окна — Revit грузит старый DLL.
         private const string BUILD = "квартиры v14 (офис — на самое большое)";
@@ -62,13 +61,11 @@ namespace TNovUtilsAR
                 var report = new StringBuilder();
                 report.AppendLine($"[{BUILD}]  Вид: {view.Name}, масштаб 1:{view.Scale}");
                 if (RevitAPI.UiApplication == null) RevitAPI.Initialize(commandData);
-                string _ver = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
-                TNovConfigLoad.LoadConfig("Марки квартир", _ver);
-                Logger.Initialize("Марки квартир", DateTime.Now, _ver);
+                Logger.Initialize("Марки квартир", DateTime.Now, BUILD);
 
                 if (!(view is ViewPlan))
                 {
-                    TaskDialog.Show($"Марки квартир [{BUILD}]", "Команда работает только на планах.");
+                    PluginReport.Show($"Марки квартир [{BUILD}]", "Команда работает только на планах.");
                     return Result.Failed;
                 }
 
@@ -76,7 +73,7 @@ namespace TNovUtilsAR
                 FamilySymbol tagType = FindTagType(doc, TAG_FAMILY, TAG_TYPE);
                 if (tagType == null)
                 {
-                    TaskDialog.Show($"Марки квартир [{BUILD}]",
+                    PluginReport.Show($"Марки квартир [{BUILD}]",
                         $"Не найдено семейство марки \"{TAG_FAMILY}\".\n" +
                         "Загрузите его в проект и повторите.");
                     return Result.Failed;
@@ -107,7 +104,7 @@ namespace TNovUtilsAR
                     report.AppendLine();
                     report.AppendLine("Параметры первого помещения (имя=значение):");
                     report.AppendLine(DumpRoomParams(rooms.FirstOrDefault()));
-                    TaskDialog.Show($"Марки квартир [{BUILD}]", report.ToString());
+                    PluginReport.Show($"Марки квартир [{BUILD}]", report.ToString());
                     return Result.Succeeded;
                 }
 
@@ -125,7 +122,7 @@ namespace TNovUtilsAR
                     double minX, maxX, minY, maxY;
                     if (!BuildingExtent(doc, view, rooms, out minX, out maxX, out minY, out maxY))
                     {
-                        TaskDialog.Show($"Марки квартир [{BUILD}]", "Не удалось определить габарит здания.");
+                        PluginReport.Show($"Марки квартир [{BUILD}]", "Не удалось определить габарит здания.");
                         return Result.Failed;
                     }
                     midY = (minY + maxY) / 2;
@@ -203,7 +200,7 @@ namespace TNovUtilsAR
                 report.AppendLine("\nПо объектам (номер: комнат, статус):");
                 foreach (var c in all.Concat(offices).OrderBy(c => c.Key))
                     report.AppendLine($"  {c.Key}: комнат {c.Rooms}, {(c.Ok ? "OK" : "НЕ УДАЛОСЬ")}");
-                TaskDialog.Show($"Марки квартир [{BUILD}]", report.ToString());
+                PluginReport.Show($"Марки квартир [{BUILD}]", report.ToString());
                 return Result.Succeeded;
             }
             catch (Autodesk.Revit.Exceptions.OperationCanceledException)
@@ -428,7 +425,11 @@ namespace TNovUtilsAR
             string k = ParamText(r.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS));
             if (string.IsNullOrWhiteSpace(k)) k = ParamText(r.LookupParameter("N_Кв.Номер"));
             if (string.IsNullOrWhiteSpace(k)) k = ParamText(r.LookupParameter("N_Кв.НомерНаЭтаже"));
-            if (string.IsNullOrWhiteSpace(k)) k = "офис_" + r.Id.ToString();
+#if R2022
+            if (string.IsNullOrWhiteSpace(k)) k = "офис_" + r.Id.IntegerValue;
+#else
+            if (string.IsNullOrWhiteSpace(k)) k = "офис_" + r.Id.Value;
+#endif
             return k;
         }
 

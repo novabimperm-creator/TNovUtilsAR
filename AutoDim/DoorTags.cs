@@ -6,7 +6,6 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using TNovCommon;
-using Parameter = Autodesk.Revit.DB.Parameter;
 
 namespace TNovUtilsAR
 {
@@ -15,7 +14,7 @@ namespace TNovUtilsAR
     /// pmN.Марка_Дверь, тип «Маркировка типоразмера_План», по центру двери.
     /// </summary>
     [Transaction(TransactionMode.Manual)]
-    public class AutoDoorTags : IExternalCommand
+    public class AutoDoorTagsCommand : IExternalCommand
     {
         // Метка сборки. Если её нет в заголовке окна — Revit грузит старый DLL.
         private const string BUILD = "двери v2 (без проёмов)";
@@ -37,13 +36,11 @@ namespace TNovUtilsAR
                 var report = new StringBuilder();
                 report.AppendLine($"[{BUILD}]  Вид: {view.Name}, масштаб 1:{view.Scale}");
                 if (RevitAPI.UiApplication == null) RevitAPI.Initialize(commandData);
-                string _ver = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
-                TNovConfigLoad.LoadConfig("Марки дверей", _ver);
-                Logger.Initialize("Марки дверей", DateTime.Now, _ver);
+                Logger.Initialize("Марки дверей", DateTime.Now, BUILD);
 
                 if (!(view is ViewPlan))
                 {
-                    TaskDialog.Show($"Марки дверей [{BUILD}]", "Команда работает только на планах.");
+                    PluginReport.Show($"Марки дверей [{BUILD}]", "Команда работает только на планах.");
                     return Result.Failed;
                 }
 
@@ -51,7 +48,7 @@ namespace TNovUtilsAR
                 FamilySymbol tagType = FindTagType(doc, TAG_FAMILY, TAG_TYPE);
                 if (tagType == null)
                 {
-                    TaskDialog.Show($"Марки дверей [{BUILD}]",
+                    PluginReport.Show($"Марки дверей [{BUILD}]",
                         $"Не найдено семейство марки двери \"{TAG_FAMILY}\".\n" +
                         "Загрузите семейство в проект и повторите.");
                     return Result.Failed;
@@ -73,7 +70,7 @@ namespace TNovUtilsAR
                 report.AppendLine($"Дверей в виде: {all.Count}, из них родительских (без проёмов): {doors.Count}");
                 if (doors.Count == 0)
                 {
-                    TaskDialog.Show($"Марки дверей [{BUILD}]", report.ToString());
+                    PluginReport.Show($"Марки дверей [{BUILD}]", report.ToString());
                     return Result.Succeeded;
                 }
 
@@ -99,7 +96,7 @@ namespace TNovUtilsAR
 
                 report.AppendLine($"\nИТОГО: марок дверей {placed}, не удалось {failed}, " +
                     $"пропущено (уже есть) {skipped}");
-                TaskDialog.Show($"Марки дверей [{BUILD}]", report.ToString());
+                PluginReport.Show($"Марки дверей [{BUILD}]", report.ToString());
                 return Result.Succeeded;
             }
             catch (Autodesk.Revit.Exceptions.OperationCanceledException)

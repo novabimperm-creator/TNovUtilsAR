@@ -1,0 +1,48 @@
+Z:\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR.csproj.AssemblyReference.cache
+Z:\DEV\TNovUtilsAR\obj\R2027\AM\CreateViewsWindow.baml
+Z:\DEV\TNovUtilsAR\obj\R2027\AM\CreateViewsWindow.g.cs
+Z:\DEV\TNovUtilsAR\obj\R2027\CopyWindowsWPF.g.cs
+Z:\DEV\TNovUtilsAR\obj\R2027\LevelNumberWPF.g.cs
+Z:\DEV\TNovUtilsAR\obj\R2027\GeneratedInternalTypeHelper.g.cs
+Z:\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR_MarkupCompile.cache
+Z:\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR_MarkupCompile.lref
+\\fs-nova\Distr\0.For Admin\_TNov\build\2027\runtimes\win-x64\native\WebView2Loader.dll
+\\fs-nova\Distr\0.For Admin\_TNov\build\2027\TNovUtilsAR.deps.json
+\\fs-nova\Distr\0.For Admin\_TNov\build\2027\TNovUtilsAR.dll
+\\fs-nova\Distr\0.For Admin\_TNov\build\2027\TNovUtilsAR.pdb
+Z:\DEV\TNovUtilsAR\obj\R2027\CopyWindowsWPF.baml
+Z:\DEV\TNovUtilsAR\obj\R2027\LevelNumberWPF.baml
+Z:\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR.g.resources
+Z:\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR.GeneratedMSBuildEditorConfig.editorconfig
+Z:\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR.csproj.CoreCompileInputs.cache
+Z:\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR.sourcelink.json
+Z:\DEV\TNovUtilsAR\obj\R2027\TNovUtil.71A82414.Up2Date
+Z:\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR.dll
+Z:\DEV\TNovUtilsAR\obj\R2027\refint\TNovUtilsAR.dll
+Z:\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR.pdb
+Z:\DEV\TNovUtilsAR\obj\R2027\ref\TNovUtilsAR.dll
+Z:\DEV\_build-test\2027\runtimes\win-x64\native\WebView2Loader.dll
+Z:\DEV\_build-test\2027\TNovUtilsAR.deps.json
+Z:\DEV\_build-test\2027\TNovUtilsAR.dll
+Z:\DEV\_build-test\2027\TNovUtilsAR.pdb
+Z:\DEV\_build-test\2027\System.Resources.Extensions.dll
+\\fs-nova\Distr\0.For Admin\_TNov\build\2027\System.Resources.Extensions.dll
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR.csproj.AssemblyReference.cache
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\AM\CreateViewsWindow.baml
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\AM\CreateViewsWindow.g.cs
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\CopyWindowsWPF.g.cs
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\LevelNumberWPF.g.cs
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\GeneratedInternalTypeHelper.g.cs
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR_MarkupCompile.cache
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR_MarkupCompile.lref
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR.dll
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\refint\TNovUtilsAR.dll
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR.pdb
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\CopyWindowsWPF.baml
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\LevelNumberWPF.baml
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR.g.resources
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR.GeneratedMSBuildEditorConfig.editorconfig
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR.csproj.CoreCompileInputs.cache
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR.sourcelink.json
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\TNovUtil.71A82414.Up2Date
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\ref\TNovUtilsAR.dll

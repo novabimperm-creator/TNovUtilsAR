@@ -1,0 +1,206 @@
+{
+  "format": 1,
+  "restore": {
+    "\\\\fs-nova\\NOVA\\DEV\\TNovUtilsAR\\TNovUtilsAR.csproj": {}
+  },
+  "projects": {
+    "\\\\fs-nova\\NOVA\\DEV\\TNovCommon\\TNovCommon.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "\\\\fs-nova\\NOVA\\DEV\\TNovCommon\\TNovCommon.csproj",
+        "projectName": "TNovCommon",
+        "projectPath": "\\\\fs-nova\\NOVA\\DEV\\TNovCommon\\TNovCommon.csproj",
+        "packagesPath": "C:\\Users\\roshior.a\\AppData\\Local\\Temp\\cursor-sandbox-cache\\57a4e117b953fa31133bec8238e5a415\\nuget",
+        "outputPath": "\\\\fs-nova\\NOVA\\DEV\\TNovCommon\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\roshior.a\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net48"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net48": {
+            "framework": "net48",
+            "targetAlias": "net48",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.300"
+      },
+      "frameworks": {
+        "net48": {
+          "framework": "net48",
+          "targetAlias": "net48",
+          "dependencies": {
+            "EPPlus": {
+              "target": "Package",
+              "version": "[6.1.3, )"
+            },
+            "Microsoft.Bcl.AsyncInterfaces": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "Microsoft.Bcl.HashCode": {
+              "target": "Package",
+              "version": "[1.1.1, )"
+            },
+            "Microsoft.Extensions.DependencyInjection.Abstractions": {
+              "target": "Package",
+              "version": "[8.0.2, )"
+            },
+            "Microsoft.Extensions.Logging.Abstractions": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "Microsoft.Web.WebView2": {
+              "target": "Package",
+              "version": "[1.0.3967.48, )"
+            },
+            "Newtonsoft.Json": {
+              "target": "Package",
+              "version": "[13.0.4, )"
+            },
+            "Revit_All_Main_Versions_API_x64": {
+              "include": "Compile, Build",
+              "target": "Package",
+              "version": "[2022.*, )"
+            },
+            "System.Buffers": {
+              "target": "Package",
+              "version": "[4.6.1, )"
+            },
+            "System.Collections.Immutable": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "System.Diagnostics.DiagnosticSource": {
+              "target": "Package",
+              "version": "[8.0.1, )"
+            },
+            "System.Memory": {
+              "target": "Package",
+              "version": "[4.6.3, )"
+            },
+            "System.Numerics.Vectors": {
+              "target": "Package",
+              "version": "[4.6.1, )"
+            },
+            "System.Resources.Extensions": {
+              "target": "Package",
+              "version": "[4.6.0, )",
+              "generatePathProperty": true
+            },
+            "System.Runtime.CompilerServices.Unsafe": {
+              "target": "Package",
+              "version": "[6.1.2, )"
+            },
+            "System.Text.Encodings.Web": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "System.Text.Json": {
+              "target": "Package",
+              "version": "[8.0.5, )"
+            },
+            "System.Threading.Channels": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "System.Threading.Tasks.Extensions": {
+              "target": "Package",
+              "version": "[4.6.3, )"
+            },
+            "System.ValueTuple": {
+              "target": "Package",
+              "version": "[4.5.0, )"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.301\\RuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "\\\\fs-nova\\NOVA\\DEV\\TNovUtilsAR\\TNovUtilsAR.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "\\\\fs-nova\\NOVA\\DEV\\TNovUtilsAR\\TNovUtilsAR.csproj",
+        "projectName": "TNovUtilsAR",
+        "projectPath": "\\\\fs-nova\\NOVA\\DEV\\TNovUtilsAR\\TNovUtilsAR.csproj",
+        "packagesPath": "C:\\Users\\roshior.a\\AppData\\Local\\Temp\\cursor-sandbox-cache\\57a4e117b953fa31133bec8238e5a415\\nuget",
+        "outputPath": "\\\\fs-nova\\NOVA\\DEV\\TNovUtilsAR\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\roshior.a\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net48"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net48": {
+            "framework": "net48",
+            "targetAlias": "net48",
+            "projectReferences": {
+              "\\\\fs-nova\\NOVA\\DEV\\TNovCommon\\TNovCommon.csproj": {
+                "projectPath": "\\\\fs-nova\\NOVA\\DEV\\TNovCommon\\TNovCommon.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.300"
+      },
+      "frameworks": {
+        "net48": {
+          "framework": "net48",
+          "targetAlias": "net48",
+          "dependencies": {
+            "Newtonsoft.Json": {
+              "target": "Package",
+              "version": "[13.0.4, )"
+            },
+            "Revit_All_Main_Versions_API_x64": {
+              "include": "Compile, Build",
+              "target": "Package",
+              "version": "[2022.*, )"
+            },
+            "System.Resources.Extensions": {
+              "target": "Package",
+              "version": "[4.6.0, )",
+              "generatePathProperty": true
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.301\\RuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

@@ -6,7 +6,6 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using TNovCommon;
-using Parameter = Autodesk.Revit.DB.Parameter;
 
 namespace TNovUtilsAR
 {
@@ -16,7 +15,7 @@ namespace TNovUtilsAR
     /// ориентацию окна (текст идёт вдоль стены).
     /// </summary>
     [Transaction(TransactionMode.Manual)]
-    public class AutoWindowTags : IExternalCommand
+    public class AutoWindowTagsCommand : IExternalCommand
     {
         // Метка сборки. Если её нет в заголовке окна — Revit грузит старый DLL.
         private const string BUILD = "окна v7 (витраж только с маркой)";
@@ -49,13 +48,11 @@ namespace TNovUtilsAR
                 var report = new StringBuilder();
                 report.AppendLine($"[{BUILD}]  Вид: {view.Name}, масштаб 1:{view.Scale}");
                 if (RevitAPI.UiApplication == null) RevitAPI.Initialize(commandData);
-                string _ver = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
-                TNovConfigLoad.LoadConfig("Марки окон", _ver);
-                Logger.Initialize("Марки окон", DateTime.Now, _ver);
+                Logger.Initialize("Марки окон", DateTime.Now, BUILD);
 
                 if (!(view is ViewPlan))
                 {
-                    TaskDialog.Show($"Марки окон [{BUILD}]", "Команда работает только на планах.");
+                    PluginReport.Show($"Марки окон [{BUILD}]", "Команда работает только на планах.");
                     return Result.Failed;
                 }
 
@@ -64,7 +61,7 @@ namespace TNovUtilsAR
                 FamilySymbol vitType = FindTagType(doc, VITRAZH_TAG_FAMILY, VITRAZH_TAG_TYPE);
                 if (tagType == null && vitType == null)
                 {
-                    TaskDialog.Show($"Марки окон [{BUILD}]",
+                    PluginReport.Show($"Марки окон [{BUILD}]",
                         $"Не найдено ни \"{TAG_FAMILY}\", ни \"{VITRAZH_TAG_FAMILY}\".\n" +
                         "Загрузите семейства марок в проект и повторите.");
                     return Result.Failed;
@@ -103,7 +100,7 @@ namespace TNovUtilsAR
                     $"витражных стен: {curtain.Count}, с маркой: {vitrazhi.Count}");
                 if (windows.Count == 0 && vitrazhi.Count == 0)
                 {
-                    TaskDialog.Show($"Марки окон [{BUILD}]", report.ToString());
+                    PluginReport.Show($"Марки окон [{BUILD}]", report.ToString());
                     return Result.Succeeded;
                 }
 
@@ -145,7 +142,7 @@ namespace TNovUtilsAR
                     (tagType == null ? " (тип марки окна не найден)" : ""));
                 report.AppendLine($"ИТОГО витражей: марок {vPlaced}, не удалось {vFailed}, пропущено {vSkipped}" +
                     (vitType == null ? " (тип марки витража не найден)" : ""));
-                TaskDialog.Show($"Марки окон [{BUILD}]", report.ToString());
+                PluginReport.Show($"Марки окон [{BUILD}]", report.ToString());
                 return Result.Succeeded;
             }
             catch (Autodesk.Revit.Exceptions.OperationCanceledException)

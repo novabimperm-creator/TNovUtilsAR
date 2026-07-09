@@ -6,12 +6,11 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using TNovCommon;
-using Parameter = Autodesk.Revit.DB.Parameter;
 
 namespace TNovUtilsAR
 {
     [Transaction(TransactionMode.Manual)]
-    public class AutoDim : IExternalCommand
+    public class AutoDimensionGridsCommand : IExternalCommand
     {
         // Метка сборки. Если её нет в заголовке окна — Revit грузит старый DLL.
         private const string BUILD = "build v21 (замер плоскостей с откатом)";
@@ -41,13 +40,11 @@ namespace TNovUtilsAR
             var report = new StringBuilder();
             report.AppendLine($"[{BUILD}]  Вид: {view.Name} ({view.GetType().Name}), масштаб 1:{view.Scale}");
             if (RevitAPI.UiApplication == null) RevitAPI.Initialize(commandData);
-            string _ver = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
-            TNovConfigLoad.LoadConfig("Авторазмеры", _ver);
-            Logger.Initialize("Авторазмеры", DateTime.Now, _ver);
+            Logger.Initialize("Авторазмеры", DateTime.Now, BUILD);
 
             if (!(view is ViewPlan) && !(view is ViewSection))
             {
-                TaskDialog.Show($"Авторазмеры [{BUILD}]", "Команда работает только на планах, фасадах и разрезах.");
+                PluginReport.Show($"Авторазмеры [{BUILD}]", "Команда работает только на планах, фасадах и разрезах.");
                 return Result.Failed;
             }
 
@@ -94,7 +91,7 @@ namespace TNovUtilsAR
             }
 
             report.AppendLine($"\nИТОГО: цепочек осей {gridDims}, общих размеров {overallDims}, цепочек проёмов {openingDims}");
-            TaskDialog.Show($"Авторазмеры [{BUILD}]", report.ToString());
+            PluginReport.Show($"Авторазмеры [{BUILD}]", report.ToString());
             return Result.Succeeded;
         }
 
@@ -282,8 +279,13 @@ namespace TNovUtilsAR
                 .OfClass(typeof(FamilyInstance))
                 .Cast<FamilyInstance>()
                 .Where(fi => fi.Category != null &&
-                    (fi.Category.Id == new ElementId(BuiltInCategory.OST_Windows) ||
-                     fi.Category.Id == new ElementId(BuiltInCategory.OST_Doors)))
+#if R2022
+                    (fi.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Windows ||
+                     fi.Category.Id.IntegerValue == (int)BuiltInCategory.OST_Doors))
+#else
+                    (fi.Category.Id.Value == (long)BuiltInCategory.OST_Windows ||
+                     fi.Category.Id.Value == (long)BuiltInCategory.OST_Doors))
+#endif
                 .Where(fi => fi.Host is Wall)
                 .ToList();
 

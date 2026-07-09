@@ -31,3 +31,20 @@ Z:\DEV\_build-test\2022-fix\runtimes\win-x64\native\WebView2Loader.dll
 Z:\DEV\_build-test\2022-fix\TNovUtilsAR.dll
 Z:\DEV\_build-test\2022-fix\TNovUtilsAR.pdb
 \\fs-nova\Distr\0.For Admin\_TNov\build\2022\System.Resources.Extensions.dll
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR.csproj.AssemblyReference.cache
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2022\AM\CreateViewsWindow.baml
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2022\AM\CreateViewsWindow.g.cs
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2022\CopyWindowsWPF.g.cs
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2022\LevelNumberWPF.g.cs
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2022\GeneratedInternalTypeHelper.g.cs
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR_MarkupCompile.cache
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR_MarkupCompile.lref
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR.dll
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR.pdb
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2022\CopyWindowsWPF.baml
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2022\LevelNumberWPF.baml
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR.g.resources
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR.GeneratedMSBuildEditorConfig.editorconfig
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR.csproj.CoreCompileInputs.cache
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2022\TNovUtilsAR.sourcelink.json
+\\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2022\TNovUtil.71A82414.Up2Date

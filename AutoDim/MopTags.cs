@@ -7,7 +7,6 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Architecture;
 using Autodesk.Revit.UI;
 using TNovCommon;
-using Parameter = Autodesk.Revit.DB.Parameter;
 
 namespace TNovUtilsAR
 {
@@ -17,7 +16,7 @@ namespace TNovUtilsAR
     /// «Техническое». Номер помещения марка читает из параметра «Номер».
     /// </summary>
     [Transaction(TransactionMode.Manual)]
-    public class AutoMopTags : IExternalCommand
+    public class AutoMopTagsCommand : IExternalCommand
     {
         // Метка сборки. Если её нет в заголовке окна — Revit грузит старый DLL.
         private const string BUILD = "МОП v1";
@@ -39,13 +38,11 @@ namespace TNovUtilsAR
                 var report = new StringBuilder();
                 report.AppendLine($"[{BUILD}]  Вид: {view.Name}, масштаб 1:{view.Scale}");
                 if (RevitAPI.UiApplication == null) RevitAPI.Initialize(commandData);
-                string _ver = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
-                TNovConfigLoad.LoadConfig("Марки МОП", _ver);
-                Logger.Initialize("Марки МОП", DateTime.Now, _ver);
+                Logger.Initialize("Марки МОП", DateTime.Now, BUILD);
 
                 if (!(view is ViewPlan))
                 {
-                    TaskDialog.Show($"Марки МОП [{BUILD}]", "Команда работает только на планах.");
+                    PluginReport.Show($"Марки МОП [{BUILD}]", "Команда работает только на планах.");
                     return Result.Failed;
                 }
 
@@ -53,7 +50,7 @@ namespace TNovUtilsAR
                 RoomTagType tagType = FindTagType(doc, TAG_FAMILY, TAG_TYPE);
                 if (tagType == null)
                 {
-                    TaskDialog.Show($"Марки МОП [{BUILD}]",
+                    PluginReport.Show($"Марки МОП [{BUILD}]",
                         $"Не найдено семейство марки \"{TAG_FAMILY}\" с типом \"{TAG_TYPE}\".\n" +
                         "Загрузите семейство/тип в проект и повторите.");
                     return Result.Failed;
@@ -70,7 +67,7 @@ namespace TNovUtilsAR
                 report.AppendLine($"Помещений МОП/технических в виде: {rooms.Count}");
                 if (rooms.Count == 0)
                 {
-                    TaskDialog.Show($"Марки МОП [{BUILD}]", report.ToString());
+                    PluginReport.Show($"Марки МОП [{BUILD}]", report.ToString());
                     return Result.Succeeded;
                 }
 
@@ -101,7 +98,7 @@ namespace TNovUtilsAR
 
                 report.AppendLine($"\nИТОГО: марок МОП {placed}, не удалось {failed}, " +
                     $"пропущено (уже есть) {skipped}");
-                TaskDialog.Show($"Марки МОП [{BUILD}]", report.ToString());
+                PluginReport.Show($"Марки МОП [{BUILD}]", report.ToString());
                 return Result.Succeeded;
             }
             catch (Autodesk.Revit.Exceptions.OperationCanceledException)
