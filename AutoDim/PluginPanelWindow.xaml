@@ -1,0 +1,84 @@
+<Window x:Class="TNovUtilsAR.PluginPanelWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Авторазмеры"
+        Width="360"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="#14201A" WindowStyle="None">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/TNovCommon;component/Styles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <StackPanel Margin="18">
+        <TextBlock Text="ОФОРМЛЯТОР"
+                   Foreground="{StaticResource AccentBrush}"
+                   FontSize="22"
+                   FontWeight="Bold"/>
+        <TextBlock Text="Выберите функции и нажмите «Оформить»"
+                   Foreground="{StaticResource MutedBrush}"
+                   FontSize="12"
+                   Margin="0,2,0,16"/>
+
+        <ToggleButton x:Name="AutoDimToggle" Style="{StaticResource CardToggleStyle}">
+            <StackPanel>
+                <TextBlock Text="Авторазмеры" Style="{StaticResource CardTitleStyle}"/>
+                <TextBlock Text="Оси, общий размер, цепочки проёмов по фасадам"
+                           Style="{StaticResource CardSubtitleStyle}"/>
+            </StackPanel>
+        </ToggleButton>
+
+        <ToggleButton x:Name="RoomTagsToggle" Style="{StaticResource CardToggleStyle}">
+            <StackPanel>
+                <TextBlock Text="Метки помещений" Style="{StaticResource CardTitleStyle}"/>
+                <TextBlock Text="Имя и площадь; лоджии — с коэффициентом"
+                           Style="{StaticResource CardSubtitleStyle}"/>
+            </StackPanel>
+        </ToggleButton>
+
+        <ToggleButton x:Name="MopTagsToggle" Style="{StaticResource CardToggleStyle}">
+            <StackPanel>
+                <TextBlock Text="Марки МОП" Style="{StaticResource CardTitleStyle}"/>
+                <TextBlock Text="Номер в круге для МОП и технических"
+                           Style="{StaticResource CardSubtitleStyle}"/>
+            </StackPanel>
+        </ToggleButton>
+
+        <ToggleButton x:Name="ApartmentTagsToggle" Style="{StaticResource CardToggleStyle}">
+            <StackPanel>
+                <TextBlock Text="Марки квартир" Style="{StaticResource CardTitleStyle}"/>
+                <TextBlock Text="Одна на квартиру/офис, вынос за оси, выноски"
+                           Style="{StaticResource CardSubtitleStyle}"/>
+            </StackPanel>
+        </ToggleButton>
+
+        <ToggleButton x:Name="WindowTagsToggle" Style="{StaticResource CardToggleStyle}">
+            <StackPanel>
+                <TextBlock Text="Марки окон" Style="{StaticResource CardTitleStyle}"/>
+                <TextBlock Text="Окна «Ок-…» и витражи, зазор 700 мм, поворот по стене"
+                           Style="{StaticResource CardSubtitleStyle}"/>
+            </StackPanel>
+        </ToggleButton>
+
+        <ToggleButton x:Name="DoorTagsToggle" Style="{StaticResource CardToggleStyle}">
+            <StackPanel>
+                <TextBlock Text="Марки дверей" Style="{StaticResource CardTitleStyle}"/>
+                <TextBlock Text="По центру двери, без дверных проёмов"
+                           Style="{StaticResource CardSubtitleStyle}"/>
+            </StackPanel>
+        </ToggleButton>
+
+        <Button Content="Оформить"
+                Style="{StaticResource RunButtonStyle}"
+                Click="OnRunClick"/>
+        <Button Content="Закрыть"
+                Style="{StaticResource CloseButtonStyle}"
+                Click="OnCloseClick"/>
+    </StackPanel>
+</Window>

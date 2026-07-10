@@ -10,7 +10,7 @@
         "projectUniqueName": "Z:\\DEV\\TNovCommon\\TNovCommon.csproj",
         "projectName": "TNovCommon",
         "projectPath": "Z:\\DEV\\TNovCommon\\TNovCommon.csproj",
-        "packagesPath": "C:\\Users\\Александр\\.nuget\\packages\\",
+        "packagesPath": "C:\\Users\\Александр\\AppData\\Local\\Temp\\cursor-sandbox-cache\\9d4122a244186b89db4d6bf571a18e86\\nuget",
         "outputPath": "Z:\\DEV\\TNovCommon\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
@@ -145,7 +145,7 @@
         "projectUniqueName": "Z:\\DEV\\TNovUtilsAR\\TNovUtilsAR.csproj",
         "projectName": "TNovUtilsAR",
         "projectPath": "Z:\\DEV\\TNovUtilsAR\\TNovUtilsAR.csproj",
-        "packagesPath": "C:\\Users\\Александр\\.nuget\\packages\\",
+        "packagesPath": "C:\\Users\\Александр\\AppData\\Local\\Temp\\cursor-sandbox-cache\\9d4122a244186b89db4d6bf571a18e86\\nuget",
         "outputPath": "Z:\\DEV\\TNovUtilsAR\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [

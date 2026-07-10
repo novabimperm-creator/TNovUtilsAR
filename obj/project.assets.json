@@ -1257,7 +1257,8 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\roshior.a\\.nuget\\packages\\": {}
+    "C:\\Users\\Александр\\.nuget\\packages\\": {},
+    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
     "version": "1.0.0",
@@ -1265,11 +1266,15 @@
       "projectUniqueName": "Z:\\DEV\\TNovUtilsAR\\TNovUtilsAR.csproj",
       "projectName": "TNovUtilsAR",
       "projectPath": "Z:\\DEV\\TNovUtilsAR\\TNovUtilsAR.csproj",
-      "packagesPath": "C:\\Users\\roshior.a\\.nuget\\packages\\",
+      "packagesPath": "C:\\Users\\Александр\\.nuget\\packages\\",
       "outputPath": "Z:\\DEV\\TNovUtilsAR\\obj\\",
       "projectStyle": "PackageReference",
+      "fallbackFolders": [
+        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+      ],
       "configFilePaths": [
-        "C:\\Users\\roshior.a\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Users\\Александр\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [

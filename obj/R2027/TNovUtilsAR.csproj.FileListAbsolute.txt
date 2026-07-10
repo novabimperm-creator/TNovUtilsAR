@@ -46,3 +46,5 @@ Z:\DEV\_build-test\2027\System.Resources.Extensions.dll
 \\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\TNovUtilsAR.sourcelink.json
 \\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\TNovUtil.71A82414.Up2Date
 \\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2027\ref\TNovUtilsAR.dll
+Z:\DEV\TNovUtilsAR\obj\R2027\Autodim\PluginPanelWindow.baml
+Z:\DEV\TNovUtilsAR\obj\R2027\Autodim\PluginPanelWindow.g.cs
