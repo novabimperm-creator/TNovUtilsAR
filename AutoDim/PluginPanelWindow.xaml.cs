@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using System.Windows.Input;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using WpfToggleButton = System.Windows.Controls.Primitives.ToggleButton;
@@ -36,9 +37,13 @@ namespace TNovUtilsAR
             };
         }
 
-        private void OnRunClick(object sender, RoutedEventArgs e) => RunSelected();
+        private void acceptButton_Click(object sender, RoutedEventArgs e) => RunSelected();
 
-        private void OnCloseClick(object sender, RoutedEventArgs e) => Close();
+        private void escButton_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+            Close(); 
+        }
 
         /// <summary>Запускает по порядку все выбранные функции, затем снимает выбор.</summary>
         private void RunSelected()
@@ -61,6 +66,21 @@ namespace TNovUtilsAR
             string msg = "";
             try { cmd.Execute(_data, ref msg, _elements); }
             catch (Exception ex) { TaskDialog.Show("Ошибка", ex.Message); }
+        }
+
+        private void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            string commandText = HelpLinks.GetHelpLink("Оформлятор АР");
+            var proc = new System.Diagnostics.Process();
+            proc.StartInfo.FileName = commandText;
+            proc.StartInfo.UseShellExecute = true;
+            proc.Start();
+        }
+
+        private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
         }
     }
 }
