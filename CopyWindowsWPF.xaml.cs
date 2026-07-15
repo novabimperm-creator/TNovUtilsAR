@@ -7,6 +7,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Input;
 
 namespace TNovUtilsAR
 {
@@ -37,12 +38,12 @@ namespace TNovUtilsAR
                 IsSelected = false
             }).ToList();
 
-            // Создаём представление с группировкой по категории
+            // Создаём представление с сортировкой по категории
             ICollectionView view = CollectionViewSource.GetDefaultView(_viewModels);
-            view.GroupDescriptions.Add(new PropertyGroupDescription("Category"));
-            ItemsListView.ItemsSource = view;
+            view.SortDescriptions.Add(new SortDescription(nameof(ItemViewModel.Category), ListSortDirection.Ascending));
+            ItemsDataGrid.ItemsSource = view;
 
-            // Устанавливаем выбранный элемент ComboBox (это вызовет событие, но ItemsListView уже инициализирован)
+            // Устанавливаем выбранный элемент ComboBox (это вызовет событие, но ItemsDataGrid уже инициализирован)
             CategoryFilterCombo.SelectedIndex = 0;
         }
 
@@ -56,7 +57,7 @@ namespace TNovUtilsAR
 
         private void SelectAll_Click(object sender, RoutedEventArgs e)
         {
-            if (ItemsListView.ItemsSource is ICollectionView view)
+            if (ItemsDataGrid.ItemsSource is ICollectionView view)
             {
                 foreach (ItemViewModel vm in view.Cast<ItemViewModel>())
                 {
@@ -67,7 +68,7 @@ namespace TNovUtilsAR
 
         private void DeselectAll_Click(object sender, RoutedEventArgs e)
         {
-            if (ItemsListView.ItemsSource is ICollectionView view)
+            if (ItemsDataGrid.ItemsSource is ICollectionView view)
             {
                 foreach (ItemViewModel vm in view.Cast<ItemViewModel>())
                 {
@@ -115,7 +116,7 @@ namespace TNovUtilsAR
         private void CategoryFilter_Changed(object sender, SelectionChangedEventArgs e)
         {
             // Защита от вызова до полной инициализации
-            if (ItemsListView?.ItemsSource is ICollectionView view)
+            if (ItemsDataGrid?.ItemsSource is ICollectionView view)
             {
                 ComboBoxItem selectedItem = CategoryFilterCombo.SelectedItem as ComboBoxItem;
                 if (selectedItem == null) return;
@@ -136,9 +137,10 @@ namespace TNovUtilsAR
             }
         }
 
-        private void Border_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
         {
-
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
         }
 
         private void escButton_Click(object sender, RoutedEventArgs e)

@@ -50,3 +50,7 @@ Z:\DEV\_build-test\2022-fix\TNovUtilsAR.pdb
 \\fs-nova\NOVA\DEV\TNovUtilsAR\obj\R2022\TNovUtil.71A82414.Up2Date
 Z:\DEV\TNovUtilsAR\obj\R2022\Autodim\PluginPanelWindow.baml
 Z:\DEV\TNovUtilsAR\obj\R2022\Autodim\PluginPanelWindow.g.cs
+Z:\DEV\_build\TNov\runtimes\win-x64\native\WebView2Loader.dll
+Z:\DEV\_build\TNov\System.Resources.Extensions.dll
+Z:\DEV\_build\TNov\TNovUtilsAR.dll
+Z:\DEV\_build\TNov\TNovUtilsAR.pdb

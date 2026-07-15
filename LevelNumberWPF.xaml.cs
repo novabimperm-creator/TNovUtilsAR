@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
+using System.Windows.Input;
 
 namespace TNovUtilsAR
 {
@@ -28,9 +29,10 @@ namespace TNovUtilsAR
             this.Close(); // закрытие окна
         }
 
-        private void Border_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
         {
-
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
         }
 
         private void HelpButton_Click(object sender, RoutedEventArgs e)
