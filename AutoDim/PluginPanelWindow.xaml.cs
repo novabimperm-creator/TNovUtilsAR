@@ -33,7 +33,11 @@ namespace TNovUtilsAR
                 (MopTagsToggle, () => new AutoMopTagsCommand()),
                 (ApartmentTagsToggle, () => new AutoApartmentTagsCommand()),
                 (WindowTagsToggle, () => new AutoWindowTagsCommand()),
-                (DoorTagsToggle, () => new AutoDoorTagsCommand())
+                (DoorTagsToggle, () => new AutoDoorTagsCommand()),
+                (WindowViewsToggle, () => new AutoWindowViewsCommand
+                {
+                    Decorate = WindowViewsDecorate.IsChecked == true
+                })
             };
         }
 

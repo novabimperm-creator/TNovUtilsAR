@@ -101,6 +101,18 @@
                 </StackPanel>
             </ToggleButton>
 
+            <ToggleButton x:Name="WindowViewsToggle" Style="{StaticResource CardToggleStyle}">
+                <StackPanel>
+                    <TextBlock Text="Виды окон" Style="{StaticResource CardTitleStyle}"/>
+                    <TextBlock Text="Фасад на каждую маркировку «Ок-…», шаблон и обрезка"
+                           Style="{StaticResource CardSubtitleStyle}"/>
+                    <CheckBox x:Name="WindowViewsDecorate" IsChecked="True" Margin="0,7,0,0">
+                        <TextBlock Text="Оформлять виды (область, разрезы, размеры)"
+                               Style="{StaticResource CardSubtitleStyle}" Margin="0"/>
+                    </CheckBox>
+                </StackPanel>
+            </ToggleButton>
+
             <Button Content="Оформить"
                 Style="{StaticResource RunButtonStyle}"
                 Click="acceptButton_Click"/>
