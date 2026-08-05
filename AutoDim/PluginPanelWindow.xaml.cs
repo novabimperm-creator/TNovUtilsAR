@@ -37,7 +37,8 @@ namespace TNovUtilsAR
                 (WindowViewsToggle, () => new AutoWindowViewsCommand
                 {
                     Decorate = WindowViewsDecorate.IsChecked == true
-                })
+                }),
+                (CurtainViewsToggle, () => new AutoCurtainViewsCommand())
             };
         }
 

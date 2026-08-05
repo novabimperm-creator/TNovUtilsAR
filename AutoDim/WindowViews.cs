@@ -28,7 +28,7 @@ namespace TNovUtilsAR
     public class AutoWindowViewsCommand : IExternalCommand
     {
         // Метка сборки. Если её нет в заголовке окна — Revit грузит старый DLL.
-        private const string BUILD = "виды окон v27 (тип марки — Маркировка типоразмера)";
+        private const string BUILD = "виды окон v29 (разнос на фасаде и разрезе)";
 
         // Тип фасада (ViewFamilyType семейства «Фасад») и шаблон вида.
         private const string ELEV_TYPE = "Р_Основной";
@@ -93,6 +93,8 @@ namespace TNovUtilsAR
         // чтобы размеры не налезали на линию обрыва.
         private const double SEC_DIM_OFFSET_MM = 650.0;
         private const double SEC_DIM_STEP_MM = 300.0;
+        // Ширина знака относительно размера шрифта (для оценки ширины текста размера).
+        private const double TEXT_CHAR_W_FACTOR = 0.65;
 
         /// <summary>Оформлять созданные виды (область, разрезы, размеры). Ставится панелью.</summary>
         public bool Decorate { get; set; } = true;
@@ -1321,8 +1323,8 @@ namespace TNovUtilsAR
                     if (cd != null)
                     {
                         done++;
-                        // на вертикальном разрезе тесные сегменты выносим наружу выноской
-                        if (!horizontal) PullSmallSegments(cd, uOut, Mm(250), Mm(SEC_DIM_STEP_MM));
+                        // на вертикальном разрезе тесные сегменты разносим выноской
+                        if (!horizontal) SpreadCrampedText(cd, sec, uOut);
                     }
                 }
 
@@ -1392,7 +1394,11 @@ namespace TNovUtilsAR
             if (opening != null && opening.XOk) chainH.Append(opening.Left);
             foreach (var fr in g.FacesX) chainH.Append(fr.Ref);
             if (opening != null && opening.XOk) chainH.Append(opening.Right);
-            if (chainH.Size >= 3 && TryDim(doc, view, lineChainH, chainH, decor.Dim, g.DimIds)) done++;
+            if (chainH.Size >= 3)
+            {
+                Dimension cdH = MakeDim(doc, view, lineChainH, chainH, decor.Dim, g.DimIds);
+                if (cdH != null) { done++; SpreadCrampedText(cdH, view, b.T.BasisY.Negate()); }
+            }
 
             // суффикс вручную — только если специального типа нет (тип сам даёт «(Проем)»)
             if (opening != null && opening.XOk &&
@@ -1416,7 +1422,11 @@ namespace TNovUtilsAR
             if (opening != null && opening.YOk) chainV.Append(opening.Bottom);
             foreach (var fr in g.FacesY) chainV.Append(fr.Ref);
             if (opening != null && opening.YOk) chainV.Append(opening.Top);
-            if (chainV.Size >= 3 && TryDim(doc, view, lineChainV, chainV, decor.Dim, g.DimIds)) done++;
+            if (chainV.Size >= 3)
+            {
+                Dimension cdV = MakeDim(doc, view, lineChainV, chainV, decor.Dim, g.DimIds);
+                if (cdV != null) { done++; SpreadCrampedText(cdV, view, b.T.BasisX.Negate()); }
+            }
 
             if (opening != null && opening.YOk &&
                 TryDim(doc, view, lineOpenV, Pair(opening.Bottom, opening.Top),
@@ -1716,23 +1726,50 @@ namespace TNovUtilsAR
         }
 
         /// <summary>
-        /// У мелких сегментов цепочки (значение меньше maxVal) отодвигает текст наружу
-        /// (вдоль uOut на offset) — Revit сам рисует выноску. Так тесные размеры
-        /// (30, 40, 120, 180, 200 …) выносятся за пределы цепочки и читаются.
+        /// «Разнос» тесных размеров (подход ModPlus mprDimBias): для каждого сегмента
+        /// цепочки сравнивает длину сегмента с шириной его текста (число знаков ×
+        /// ширина знака при размере шрифта типа × масштаб вида). Если текст не влезает
+        /// между выносными — отодвигает его наружу (вдоль uOut), чередуя два уровня
+        /// выноса, чтобы соседние вынесенные тексты не накладывались; Revit сам рисует
+        /// выноску. Влезающие размеры не трогаются.
         /// </summary>
-        private static void PullSmallSegments(Dimension dim, XYZ uOut, double maxVal, double offset)
+        private static void SpreadCrampedText(Dimension dim, View view, XYZ uOut)
         {
             try
             {
                 DimensionSegmentArray segs = dim.Segments;
                 if (segs == null || segs.Size == 0) return;
+
+                double scale = view.Scale > 0 ? view.Scale : 50.0;
+                double textMm = 2.5;                       // размер шрифта типа, мм (бумага)
+                try
+                {
+                    Parameter ts = dim.DimensionType?.get_Parameter(BuiltInParameter.TEXT_SIZE);
+                    if (ts != null && ts.HasValue)
+                        textMm = UnitUtils.ConvertFromInternalUnits(ts.AsDouble(), UnitTypeId.Millimeters);
+                }
+                catch { }
+
+                double charW = textMm * TEXT_CHAR_W_FACTOR; // ширина знака на бумаге, мм
+                double gapMm = textMm * scale;              // зазор у стрелок, модель, мм
+                double step = Mm(SEC_DIM_STEP_MM);          // шаг разноса, внутр. ед.
+                int moved = 0;
+
                 foreach (DimensionSegment seg in segs)
                 {
-                    if (!seg.Value.HasValue || seg.Value.Value >= maxVal) continue;
+                    if (!seg.Value.HasValue) continue;
+                    double segLenMm = UnitUtils.ConvertFromInternalUnits(seg.Value.Value, UnitTypeId.Millimeters);
+                    string val = seg.ValueString ?? "";
+                    double textLenMm = val.Length * charW * scale;   // ширина текста в модели, мм
+                    if (segLenMm >= textLenMm + gapMm) continue;     // влезает — не трогаем
                     try
                     {
+                        if (!seg.IsTextPositionAdjustable()) continue;
                         XYZ tp = seg.TextPosition;
-                        if (tp != null) seg.TextPosition = tp + uOut * offset;
+                        if (tp == null) continue;
+                        double off = step * (1 + (moved % 2));       // чередуем 1 и 2 шага
+                        seg.TextPosition = tp + uOut * off;
+                        moved++;
                     }
                     catch { }
                 }

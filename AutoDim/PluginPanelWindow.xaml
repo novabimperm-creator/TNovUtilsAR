@@ -113,6 +113,14 @@
                 </StackPanel>
             </ToggleButton>
 
+            <ToggleButton x:Name="CurtainViewsToggle" Style="{StaticResource CardToggleStyle}">
+                <StackPanel>
+                    <TextBlock Text="Виды витражей" Style="{StaticResource CardTitleStyle}"/>
+                    <TextBlock Text="Фасад на каждую маркировку «Вх-…», марка и размеры"
+                           Style="{StaticResource CardSubtitleStyle}"/>
+                </StackPanel>
+            </ToggleButton>
+
             <Button Content="Оформить"
                 Style="{StaticResource RunButtonStyle}"
                 Click="acceptButton_Click"/>
