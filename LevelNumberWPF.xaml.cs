@@ -4,6 +4,8 @@ using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
 
+using TNovCommon;
+
 namespace TNovUtilsAR
 {
     /// <summary>
@@ -37,11 +39,7 @@ namespace TNovUtilsAR
 
         private void HelpButton_Click(object sender, RoutedEventArgs e)
         {
-            string commandText = @"https://portal.talan.group/knowledge/proektirovanie/specificationsbylevel/";
-            var proc = new System.Diagnostics.Process();
-            proc.StartInfo.FileName = commandText;
-            proc.StartInfo.UseShellExecute = true;
-            proc.Start();
+            HelpLinks.ShowHelp("Эт.Номер");
         }
     }
     public class InverseConverter : IValueConverter
