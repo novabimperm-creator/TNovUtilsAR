@@ -80,6 +80,27 @@ namespace TNovUtilsAR
         {
             get => _holes; set { _holes = value; OnPropertyChanged(); }
         }
+        //определение уровня по геометрии
+        private bool _useGeometry = true;
+        public bool useGeometry
+        {
+            get => _useGeometry; set { _useGeometry = value; OnPropertyChanged(); }
+        }
+        private int _nearTolerance = 1000; //мм: уровень в пределах допуска считается ближайшим
+        public int nearTolerance
+        {
+            get => _nearTolerance; set { _nearTolerance = value; OnPropertyChanged(); }
+        }
+        private int _maxOffset = 3000; //мм: допустимое смещение от уровня
+        public int maxOffset
+        {
+            get => _maxOffset; set { _maxOffset = value; OnPropertyChanged(); }
+        }
+        private int _offsetCheckFromFloor = 2; //проверять смещение начиная с этажа
+        public int offsetCheckFromFloor
+        {
+            get => _offsetCheckFromFloor; set { _offsetCheckFromFloor = value; OnPropertyChanged(); }
+        }
         public event EventHandler CloseRequest;
         private void RaiseCloseRequest()
         {

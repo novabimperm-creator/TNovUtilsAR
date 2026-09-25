@@ -116,6 +116,57 @@
                 <TextBlock Text="Отверстия" Style="{StaticResource CardTitleStyle}"/>
             </ToggleButton>
 
+            <TextBlock Text="Элементы без уровня или с некорректной привязкой"
+                       Foreground="{StaticResource MutedBrush}"
+                       FontSize="12"
+                       Margin="0,6,0,8"/>
+
+            <ToggleButton x:Name="checkBoxGeometry"
+                          Style="{StaticResource CardToggleStyle}"
+                          IsChecked="{Binding useGeometry}">
+                <TextBlock Text="Определять уровень по отметке элемента" Style="{StaticResource CardTitleStyle}"/>
+            </ToggleButton>
+
+            <Grid Margin="0,0,0,6"
+                  IsEnabled="{Binding useGeometry}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="80"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                </Grid.RowDefinitions>
+                <TextBlock Text="Допуск до ближайшего уровня, мм"
+                           Grid.Row="0" Grid.Column="0"
+                           Foreground="{StaticResource PrimaryTextBrush}"
+                           FontSize="12"
+                           VerticalAlignment="Center"/>
+                <TextBox Grid.Row="0" Grid.Column="1"
+                         Margin="0,3"
+                         Text="{Binding nearTolerance}"
+                         Style="{StaticResource DarkCompactTextBoxStyle}"/>
+                <TextBlock Text="Допустимое смещение от уровня, мм"
+                           Grid.Row="1" Grid.Column="0"
+                           Foreground="{StaticResource PrimaryTextBrush}"
+                           FontSize="12"
+                           VerticalAlignment="Center"/>
+                <TextBox Grid.Row="1" Grid.Column="1"
+                         Margin="0,3"
+                         Text="{Binding maxOffset}"
+                         Style="{StaticResource DarkCompactTextBoxStyle}"/>
+                <TextBlock Text="Проверять смещение начиная с этажа"
+                           Grid.Row="2" Grid.Column="0"
+                           Foreground="{StaticResource PrimaryTextBrush}"
+                           FontSize="12"
+                           VerticalAlignment="Center"/>
+                <TextBox Grid.Row="2" Grid.Column="1"
+                         Margin="0,3"
+                         Text="{Binding offsetCheckFromFloor}"
+                         Style="{StaticResource DarkCompactTextBoxStyle}"/>
+            </Grid>
+
             <TextBlock Text="Сценарий работы"
                        Foreground="{StaticResource MutedBrush}"
                        FontSize="12"
