@@ -91,16 +91,6 @@ namespace TNovUtilsAR
         {
             get => _nearTolerance; set { _nearTolerance = value; OnPropertyChanged(); }
         }
-        private int _maxOffset = 3000; //мм: допустимое смещение от уровня
-        public int maxOffset
-        {
-            get => _maxOffset; set { _maxOffset = value; OnPropertyChanged(); }
-        }
-        private int _offsetCheckFromFloor = 2; //проверять смещение начиная с этажа
-        public int offsetCheckFromFloor
-        {
-            get => _offsetCheckFromFloor; set { _offsetCheckFromFloor = value; OnPropertyChanged(); }
-        }
         public event EventHandler CloseRequest;
         private void RaiseCloseRequest()
         {

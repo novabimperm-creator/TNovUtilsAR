@@ -260,6 +260,7 @@ namespace TNovUtilsAR
                     case "FamilyInstance_Other":
                     case "Stairs":
                     case "Railing":
+                    case "SlabEdge":
                         if (viewModel.other) { allcount++; elemsToWork.Add(tNovElem); }
                         ; break;
                     case "FamilyInstance_Hole":
@@ -280,9 +281,7 @@ namespace TNovUtilsAR
             LevelResolver resolver = new LevelResolver(doc, new LevelNumberSettings
             {
                 useGeometry = viewModel.useGeometry,
-                nearTolerance = viewModel.nearTolerance,
-                maxOffset = viewModel.maxOffset,
-                offsetCheckFromFloor = viewModel.offsetCheckFromFloor
+                nearTolerance = viewModel.nearTolerance
             });
 
 
@@ -294,6 +293,17 @@ namespace TNovUtilsAR
                 {
                     transaction.Start("TNov - Эт.Номер");
                     Logger.Log("Открываем транзакцию", 1);
+
+                    //назначение параметра новым категориям (Устройства вызова и оповещения, Ребра плит)
+                    if (viewModel.other)
+                    {
+                        List<string> addedCats = LevelNumberParam.EnsureBinding(doc, LevelNumberParam.AutoBindCategories, out string bindError);
+                        if (addedCats.Count > 0) { doc.Regenerate(); Logger.Log("Параметр N_Эт.Номер добавлен к категориям: " + String.Join(", ", addedCats), 3); }
+                        if (bindError != null) Logger.Log(bindError, 4);
+                    }
+                    //у элементов в группах параметр доступен, только если разрешены разные значения по экземплярам групп
+                    if (elemsToWork.Any(t => t.elem.GroupId != ElementId.InvalidElementId) && LevelNumberParam.AllowVaryBetweenGroups(doc))
+                        Logger.Log("Для N_Эт.Номер включено 'Значения могут отличаться у экземпляров групп'", 3);
 
                     Thread thread = new Thread(new ThreadStart(this.ThreadStartingPoint));
                     thread.SetApartmentState(ApartmentState.STA);
@@ -319,7 +329,7 @@ namespace TNovUtilsAR
 
                         //определение уровня и заполнение параметра
                         LevelResolveResult resolved = resolver.Resolve(elem);
-                        if (resolved.Level != null)
+                        if (resolved.Number.HasValue)
                         {
                             if (resolved.ByGeometry)
                             {
@@ -329,7 +339,8 @@ namespace TNovUtilsAR
                             else if (resolved.Source == LevelSource.Fallback)
                                 Logger.Log(elem.Id.ToString() + " - уровень из запасного параметра: " + resolved.Info, 2);
 
-                            SetLevelParam(elem.Id, resolved.Level, NLevelNumberParamGuid, out bool success);
+                            Logger.Log("   " + resolved.Info + " -> " + resolved.Number.Value.ToString(), 2);
+                            SetLevelParam(elem.Id, resolved.Number.Value, NLevelNumberParamGuid, out bool success);
                             if (!success)
                             {
                                 failed.Add(elem.Id.ToString()); failscount++;
@@ -406,21 +417,35 @@ namespace TNovUtilsAR
             }
         }
 
-        private void SetLevelParam(ElementId elemid, Level level, in Guid param1, out bool success)
+        private void SetLevelParam(ElementId elemid, double levelNumber, in Guid param1, out bool success)
         {
 
             string eid = elemid.ToString();
             Element elem = RevitAPI.Document.GetElement(elemid);
             Logger.Log("   Элемент " + eid + ":", 2);
-            double num = LevelNumberParam.Encode(LevelResolver.ParseLevelNumber(level.Name));
+            double num = LevelNumberParam.Encode(levelNumber);
 
             success = false;
 
             if (Param.ParamExistByGuid(param1, elem))
             {
+                Parameter p = elem.get_Parameter(param1);
+                if (LevelNumberParam.IsDrivenByParent(elem, p))
+                {
+                    //вложенное общее семейство: значение приходит из родительского семейства
+                    success = true;
+                    Logger.Log("   пропущено: вложенное семейство, значение задается родительским", 2);
+                    return;
+                }
+                if (p.IsReadOnly)
+                {
+                    Logger.Log("Элемент " + eid + " Ошибка: параметр только для чтения" +
+                        (elem.GroupId != ElementId.InvalidElementId ? " (элемент в группе)" : " (значение задано в семействе?)"), 4);
+                    return;
+                }
                 try
                 {
-                    elem.get_Parameter(param1)?.Set(num);
+                    p.Set(num);
                     success = true;
                     Logger.Log("   назначено " + num.ToString(), 2);
                 }
@@ -429,6 +454,7 @@ namespace TNovUtilsAR
                     Logger.Log("Элемент " + eid + " Ошибка:" + ex.Message, 4);
                 }
             }
+            else Logger.Log("Элемент " + eid + " Ошибка: параметр N_Эт.Номер не назначен категории " + elem.Category?.Name, 4);
 
 
         }
