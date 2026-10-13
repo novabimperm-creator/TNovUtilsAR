@@ -204,229 +204,268 @@ namespace TNovUtilsAR
                     foreach (Element element in selectedElements) selectedIds.Add(element.Id);
                 }
             }
-            //итоговый список
-            if (viewModel.selected)
+
+            //окно прогресса: этапы "Сбор данных" (0/1) -> "Настройка параметра" (0/1) -> элементы (0/N) -> "Применение к модели" (0/1)
+            Thread thread = new Thread(new ThreadStart(this.ThreadStartingPoint));
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.IsBackground = true;
+            thread.Start();
+            for (int i = 0; i < 50 && this.levnumProgressBar == null; i++)
+                Thread.Sleep(100);
+            if (this.levnumProgressBar == null)
             {
-                List<Element> elems1 = new List<Element>();
-                foreach(var id in selectedIds) 
-                {
-                    Element el = doc.GetElement(id); if(el != null) elems1.Add(el);
-                }
-                elems = elems1;
+                Logger.Log("Не удалось создать окно прогресса", 4);
+                return Result.Failed;
             }
-            List<TNovElement> elemsToWork = new List<TNovElement>(); int allcount = 0;
-            foreach (var elem in elems)
+            SetProgressStage("Сбор данных", 1);
+            try
             {
-                TNovElement tNovElem = new TNovElement(elem);
-                if (tNovElem.TNovCategory == "Default") continue;
-                switch (tNovElem.TNovCategory)
+                //итоговый список
+                if (viewModel.selected)
                 {
-                    case "Wall":
-                        if (viewModel.walls) { allcount++; elemsToWork.Add(tNovElem); }
-                        ; break;
-                    case "FamilyInstance_Wall":
-                        if (viewModel.walls) { allcount++; elemsToWork.Add(tNovElem); }
-                        ; break;
-                    case "Floor":
-                        if (viewModel.floors) { allcount++; elemsToWork.Add(tNovElem); }
-                        ; break;
-                    case "FamilyInstance_Floor":
-                        if (viewModel.floors) { allcount++; elemsToWork.Add(tNovElem); }
-                        ; break;
-                    case "Ceiling":
-                        if (viewModel.ceilings) { allcount++; elemsToWork.Add(tNovElem); }
-                        ; break;
-                    case "FamilyInstance_Ceiling":
-                        if (viewModel.ceilings) { allcount++; elemsToWork.Add(tNovElem); }
-                        ; break;
-                    case "FamilyInstance_DoorWindow":
-                        if(viewModel.instances) { allcount++; elemsToWork.Add(tNovElem); }
-                        ; break;
-                    case "Room":
-                        if (viewModel.rooms) { allcount++; elemsToWork.Add(tNovElem); }
-                        ; break;
-                    case "FamilyInstance_Parking":
-                        if (viewModel.park) { allcount++; elemsToWork.Add(tNovElem); }
-                        ; break;
-                    case "FamilyInstance_Other":
-                    case "Stairs":
-                    case "Railing":
-                    case "SlabEdge":
-                        if (viewModel.other) { allcount++; elemsToWork.Add(tNovElem); }
-                        ; break;
-                    case "FamilyInstance_Hole":
-                        if (viewModel.holes) { allcount++; elemsToWork.Add(tNovElem); }
-                        ; break;
-                    case "FamilyInstance_Beam":
-                        if (viewModel.beams) { allcount++; elemsToWork.Add(tNovElem); }
-                        ; break;
+                    List<Element> elems1 = new List<Element>();
+                    foreach(var id in selectedIds) 
+                    {
+                        Element el = doc.GetElement(id); if(el != null) elems1.Add(el);
+                    }
+                    elems = elems1;
                 }
-                
-            }
-            #endregion
+                List<TNovElement> elemsToWork = new List<TNovElement>(); int allcount = 0;
+                foreach (var elem in elems)
+                {
+                    TNovElement tNovElem = new TNovElement(elem);
+                    if (tNovElem.TNovCategory == "Default") continue;
+                    switch (tNovElem.TNovCategory)
+                    {
+                        case "Wall":
+                            if (viewModel.walls) { allcount++; elemsToWork.Add(tNovElem); }
+                            ; break;
+                        case "FamilyInstance_Wall":
+                            if (viewModel.walls) { allcount++; elemsToWork.Add(tNovElem); }
+                            ; break;
+                        case "Floor":
+                            if (viewModel.floors) { allcount++; elemsToWork.Add(tNovElem); }
+                            ; break;
+                        case "FamilyInstance_Floor":
+                            if (viewModel.floors) { allcount++; elemsToWork.Add(tNovElem); }
+                            ; break;
+                        case "Ceiling":
+                            if (viewModel.ceilings) { allcount++; elemsToWork.Add(tNovElem); }
+                            ; break;
+                        case "FamilyInstance_Ceiling":
+                            if (viewModel.ceilings) { allcount++; elemsToWork.Add(tNovElem); }
+                            ; break;
+                        case "FamilyInstance_DoorWindow":
+                            if(viewModel.instances) { allcount++; elemsToWork.Add(tNovElem); }
+                            ; break;
+                        case "Room":
+                            if (viewModel.rooms) { allcount++; elemsToWork.Add(tNovElem); }
+                            ; break;
+                        case "FamilyInstance_Parking":
+                            if (viewModel.park) { allcount++; elemsToWork.Add(tNovElem); }
+                            ; break;
+                        case "FamilyInstance_Other":
+                        case "Stairs":
+                        case "Railing":
+                        case "SlabEdge":
+                            if (viewModel.other) { allcount++; elemsToWork.Add(tNovElem); }
+                            ; break;
+                        case "FamilyInstance_Hole":
+                            if (viewModel.holes) { allcount++; elemsToWork.Add(tNovElem); }
+                            ; break;
+                        case "FamilyInstance_Beam":
+                            if (viewModel.beams) { allcount++; elemsToWork.Add(tNovElem); }
+                            ; break;
+                    }
+                    
+                }
+                #endregion
 
 
-            int failscount = 0;
-            List<string> failed = new List<string>(); //id элементов, которым не удалось назначить параметр
-            List<string> byGeometry = new List<string>(); //id элементов, уровень которых определен по отметке
-            LevelResolver resolver = new LevelResolver(doc, new LevelNumberSettings
-            {
-                useGeometry = viewModel.useGeometry,
-                nearTolerance = viewModel.nearTolerance
-            });
+                int failscount = 0;
+                List<string> failed = new List<string>(); //id элементов, которым не удалось назначить параметр
+                List<string> byGeometry = new List<string>(); //id элементов, уровень которых определен по отметке
+                LevelResolver resolver = new LevelResolver(doc, new LevelNumberSettings
+                {
+                    useGeometry = viewModel.useGeometry,
+                    nearTolerance = viewModel.nearTolerance
+                });
 
 
-            bool unhandledError = false;
-            #region Настройка параметра
-            //отдельной транзакцией: перерасчет модели после изменения назначения параметра выполняется один раз
-            //и сохраняется, даже если основная транзакция будет отменена
-            bool needBinding = viewModel.other;
-            bool needVary = elemsToWork.Any(t => t.elem.GroupId != ElementId.InvalidElementId);
-            if (needBinding || needVary)
-            {
-                using (Transaction setupTransaction = new Transaction(doc))
+                bool unhandledError = false;
+                #region Настройка параметра
+                //отдельной транзакцией: перерасчет модели после изменения назначения параметра выполняется один раз
+                //и сохраняется, даже если основная транзакция будет отменена
+                bool needBinding = viewModel.other;
+                bool needVary = elemsToWork.Any(t => t.elem.GroupId != ElementId.InvalidElementId);
+                SetProgressValue(1);
+                if (needBinding || needVary)
+                {
+                    SetProgressStage("Настройка параметра N_Эт.Номер", 1);
+                    using (Transaction setupTransaction = new Transaction(doc))
+                    {
+                        try
+                        {
+                            setupTransaction.Start("TNov - Эт.Номер: настройка параметра");
+                            FailureCatcher.Attach(setupTransaction, HideProgressBar);
+                            bool changed = false;
+                            //назначение параметра новым категориям (Устройства вызова и оповещения, Ребра плит)
+                            if (needBinding)
+                            {
+                                List<string> addedCats = LevelNumberParam.EnsureBinding(doc, LevelNumberParam.AutoBindCategories, out string bindError);
+                                if (addedCats.Count > 0) { changed = true; Logger.Log("Параметр N_Эт.Номер добавлен к категориям: " + String.Join(", ", addedCats), 3); }
+                                if (bindError != null) Logger.Log(bindError, 4);
+                            }
+                            //у элементов в группах параметр доступен, только если разрешены разные значения по экземплярам групп
+                            if (needVary && LevelNumberParam.AllowVaryBetweenGroups(doc))
+                            {
+                                changed = true;
+                                Logger.Log("Для N_Эт.Номер включено 'Значения могут отличаться у экземпляров групп'", 3);
+                            }
+                            if (changed)
+                            {
+                                Logger.Log("Commit настройки параметра", 1);
+                                setupTransaction.Commit();
+                                Logger.Log("Настройка параметра сохранена", 1);
+                            }
+                            else setupTransaction.RollBack();
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log("Ошибка настройки параметра N_Эт.Номер: " + ex.Message, 4);
+                            if (setupTransaction.HasStarted() && !setupTransaction.HasEnded()) setupTransaction.RollBack();
+                        }
+                    }
+                    SetProgressValue(1);
+                    ShowProgressBar(); //могло быть скрыто при ошибке Revit
+                }
+                #endregion
+
+                #region Основной код
+                using (Transaction transaction = new Transaction(doc))
                 {
                     try
                     {
-                        setupTransaction.Start("TNov - Эт.Номер: настройка параметра");
-                        FailureCatcher.Attach(setupTransaction);
-                        bool changed = false;
-                        //назначение параметра новым категориям (Устройства вызова и оповещения, Ребра плит)
-                        if (needBinding)
+                        transaction.Start("TNov - Эт.Номер");
+                        Logger.Log("Открываем транзакцию", 1);
+                        FailureCatcher.Attach(transaction, HideProgressBar); //ошибки при Commit: в лог, прогресс-бар скрыть, чтобы не перекрывал окно Revit
+
+                        int PBCount = 0;
+                        SetProgressStage("Определение уровней и заполнение параметра", allcount);
+
+                        foreach(var tNovElem in elemsToWork) //новое: универсальный цикл по всем элементам
                         {
-                            List<string> addedCats = LevelNumberParam.EnsureBinding(doc, LevelNumberParam.AutoBindCategories, out string bindError);
-                            if (addedCats.Count > 0) { changed = true; Logger.Log("Параметр N_Эт.Номер добавлен к категориям: " + String.Join(", ", addedCats), 3); }
-                            if (bindError != null) Logger.Log(bindError, 4);
+                            Element elem = doc.GetElement(tNovElem.elem.Id);
+#if R2022
+                        long idint =  elem.Id.IntegerValue;
+#else
+                            long idint = elem.Id.Value;
+#endif
+                            Logger.Log(idint.ToString(), 2);
+
+                            //определение уровня и заполнение параметра
+                            LevelResolveResult resolved = resolver.Resolve(elem);
+                            if (resolved.Number.HasValue)
+                            {
+                                if (resolved.ByGeometry)
+                                {
+                                    byGeometry.Add(elem.Id.ToString());
+                                    Logger.Log(elem.Id.ToString() + " - уровень определен по отметке: " + resolved.Info, 3);
+                                }
+                                else if (resolved.Source == LevelSource.Fallback)
+                                    Logger.Log(elem.Id.ToString() + " - уровень из запасного параметра: " + resolved.Info, 2);
+
+                                Logger.Log("   " + resolved.Info + " -> " + resolved.Number.Value.ToString(), 2);
+                                SetLevelParam(elem.Id, resolved.Number.Value, NLevelNumberParamGuid, out bool success);
+                                if (!success)
+                                {
+                                    failed.Add(elem.Id.ToString()); failscount++;
+                                }
+                            }
+                            else
+                            {
+                                failed.Add(elem.Id.ToString()); failscount++;
+                                Logger.Log(elem.Id.ToString() + " - " + resolved.Info, 4);
+                            }
+
+                            PBCount++;
+                            SetProgressValue(PBCount);
                         }
-                        //у элементов в группах параметр доступен, только если разрешены разные значения по экземплярам групп
-                        if (needVary && LevelNumberParam.AllowVaryBetweenGroups(doc))
-                        {
-                            changed = true;
-                            Logger.Log("Для N_Эт.Номер включено 'Значения могут отличаться у экземпляров групп'", 3);
-                        }
-                        if (changed)
-                        {
-                            Logger.Log("Commit настройки параметра", 1);
-                            setupTransaction.Commit();
-                            Logger.Log("Настройка параметра сохранена", 1);
-                        }
-                        else setupTransaction.RollBack();
+                        Logger.Log("Commit транзакции", 1);
+                        SetProgressStage("Применение к модели", 1);
+                        transaction.Commit();
+                        SetProgressValue(1);
+                        Logger.Log("Закрываем транзакцию.", 1);
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log("Ошибка настройки параметра N_Эт.Номер: " + ex.Message, 4);
-                        if (setupTransaction.HasStarted() && !setupTransaction.HasEnded()) setupTransaction.RollBack();
+                        Logger.Log("Ошибка: " + ex.Message, 4);
+                        new InfoWindow280("Ошибка: " + ex.Message).ShowDialog();
+                        unhandledError = true;
                     }
-                }
-            }
-            #endregion
-
-            #region Основной код
-            using (Transaction transaction = new Transaction(doc))
-            {
-                try
-                {
-                    transaction.Start("TNov - Эт.Номер");
-                    Logger.Log("Открываем транзакцию", 1);
-                    FailureCatcher.Attach(transaction, HideProgressBar); //ошибки при Commit: в лог, прогресс-бар скрыть, чтобы не перекрывал окно Revit
-
-                    Thread thread = new Thread(new ThreadStart(this.ThreadStartingPoint));
-                    thread.SetApartmentState(ApartmentState.STA);
-                    thread.IsBackground = true;
-                    thread.Start();
-                    Thread.Sleep(100);
-
-                    int PBCount = 0;
-                    this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Minimum = (double)PBCount));
-                    this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
-                    this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Maximum = (double)allcount));
-                    this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.maxvalue.Text = allcount.ToString()));
-
-                    foreach(var tNovElem in elemsToWork) //новое: универсальный цикл по всем элементам
+                    finally
                     {
-                        Element elem = doc.GetElement(tNovElem.elem.Id);
-#if R2022
-                    long idint =  elem.Id.IntegerValue;
-#else
-                        long idint = elem.Id.Value;
-#endif
-                        Logger.Log(idint.ToString(), 2);
-
-                        //определение уровня и заполнение параметра
-                        LevelResolveResult resolved = resolver.Resolve(elem);
-                        if (resolved.Number.HasValue)
-                        {
-                            if (resolved.ByGeometry)
-                            {
-                                byGeometry.Add(elem.Id.ToString());
-                                Logger.Log(elem.Id.ToString() + " - уровень определен по отметке: " + resolved.Info, 3);
-                            }
-                            else if (resolved.Source == LevelSource.Fallback)
-                                Logger.Log(elem.Id.ToString() + " - уровень из запасного параметра: " + resolved.Info, 2);
-
-                            Logger.Log("   " + resolved.Info + " -> " + resolved.Number.Value.ToString(), 2);
-                            SetLevelParam(elem.Id, resolved.Number.Value, NLevelNumberParamGuid, out bool success);
-                            if (!success)
-                            {
-                                failed.Add(elem.Id.ToString()); failscount++;
-                            }
-                        }
-                        else
-                        {
-                            failed.Add(elem.Id.ToString()); failscount++;
-                            Logger.Log(elem.Id.ToString() + " - " + resolved.Info, 4);
-                        }
-
-                        PBCount++;
-                        this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
-                        this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
+                        CloseProgressBarSafely();
                     }
-                    Logger.Log("Commit транзакции", 1);
-                    this.levnumProgressBar.Dispatcher.Invoke(new Action(() => this.levnumProgressBar.info.Text = "Revit применяет изменения, это может занять несколько минут..."));
-                    transaction.Commit();
-                    Logger.Log("Закрываем транзакцию.", 1);
+                    if (failscount != 0)
+                    {
+                        Logger.Log("Открываем окно с ID проблемных элементов: " + String.Join(",", failed), 1);
+                        // Диалоговое окно
+                        ElementsTreeWindow window = new ElementsTreeWindow(uiApp, String.Join(",", failed), DBCommandName,dateTime, TNovVersion);
+                        window.Show();
+                        /*
+                        var viewModel2 = new InfoWindowTextFieldViewModel();
+                        viewModel2.headtxt = "Один или несколько элементов не изменены:";
+                        viewModel2.ids = String.Join(",", failed);
+                        viewModel2.lowtxt = "Проверьте их вручную или посмотрите ошибки в лог-файле.";
+                        var wpfview2 = new InfoWindowTextField(viewModel2);
+                        viewModel2.CloseRequest += (s, e) => wpfview2.Close();
+                        bool? ok2 = wpfview2.ShowDialog();*/
+                    }
+                    if (byGeometry.Count != 0)
+                    {
+                        Logger.Log("Открываем окно с ID элементов, уровень которых определен по отметке: " + String.Join(",", byGeometry), 1);
+                        ElementsTreeWindow window = new ElementsTreeWindow(uiApp, String.Join(",", byGeometry), DBCommandName, dateTime, TNovVersion,
+                            "Уровень определен по отметке");
+                        window.Show();
+                    }
                 }
-                catch (Exception ex)
+                #endregion
+                if (unhandledError)
                 {
-                    Logger.Log("Ошибка: " + ex.Message, 4);
-                    new InfoWindow280("Ошибка: " + ex.Message).ShowDialog();
-                    unhandledError = true;
+                    Logger.Log("Завершение работы с ошибками.", 4);
+                    return Result.Succeeded;
                 }
-                finally
-                {
-                    CloseProgressBarSafely();
-                }
-                if (failscount != 0)
-                {
-                    Logger.Log("Открываем окно с ID проблемных элементов: " + String.Join(",", failed), 1);
-                    // Диалоговое окно
-                    ElementsTreeWindow window = new ElementsTreeWindow(uiApp, String.Join(",", failed), DBCommandName,dateTime, TNovVersion);
-                    window.Show();
-                    /*
-                    var viewModel2 = new InfoWindowTextFieldViewModel();
-                    viewModel2.headtxt = "Один или несколько элементов не изменены:";
-                    viewModel2.ids = String.Join(",", failed);
-                    viewModel2.lowtxt = "Проверьте их вручную или посмотрите ошибки в лог-файле.";
-                    var wpfview2 = new InfoWindowTextField(viewModel2);
-                    viewModel2.CloseRequest += (s, e) => wpfview2.Close();
-                    bool? ok2 = wpfview2.ShowDialog();*/
-                }
-                if (byGeometry.Count != 0)
-                {
-                    Logger.Log("Открываем окно с ID элементов, уровень которых определен по отметке: " + String.Join(",", byGeometry), 1);
-                    ElementsTreeWindow window = new ElementsTreeWindow(uiApp, String.Join(",", byGeometry), DBCommandName, dateTime, TNovVersion,
-                        "Уровень определен по отметке");
-                    window.Show();
-                }
-            }
-            #endregion
-            if (unhandledError)
-            {
-                Logger.Log("Завершение работы с ошибками.", 4);
+                Logger.Log("Завершение работы.",5);
                 return Result.Succeeded;
             }
-            Logger.Log("Завершение работы.",5);
-            return Result.Succeeded;
+            catch (Exception)
+            {
+                CloseProgressBarSafely(); //иначе окно прогресса (Topmost) перекроет сообщение Revit об ошибке
+                throw;
+            }
+        }
+        /// <summary>Новый этап: текст над полосой и значения 0/max</summary>
+        private void SetProgressStage(string text, int max)
+        {
+            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke((Action)(() =>
+            {
+                this.levnumProgressBar.info.Text = text;
+                this.levnumProgressBar.TNov_ProgressBar.Minimum = 0;
+                this.levnumProgressBar.TNov_ProgressBar.Maximum = max;
+                this.levnumProgressBar.TNov_ProgressBar.Value = 0;
+                this.levnumProgressBar.value.Text = "0";
+                this.levnumProgressBar.maxvalue.Text = max.ToString();
+            }));
+        }
+        private void SetProgressValue(int value)
+        {
+            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)value));
+            this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = value.ToString()));
+        }
+        private void ShowProgressBar()
+        {
+            this.levnumProgressBar.Dispatcher.Invoke((Action)(() => { if (!this.levnumProgressBar.IsVisible) this.levnumProgressBar.Show(); }));
         }
         private void HideProgressBar()
         {
