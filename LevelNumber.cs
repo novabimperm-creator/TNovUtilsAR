@@ -73,16 +73,7 @@ namespace TNovUtilsAR
 
 
             //имя и роль пользователя
-            string userDepartment = "-"; string userDepRole = "-";
-            string[] rolesFile = TNovCommon.Server.ServerData.ReadAllLines("roles.txt");
-            foreach (string role in rolesFile)
-            {
-                if (role.Contains(userName))
-                {
-                    string[] line = role.Split(','); userDepartment = line[1]; userDepRole = line[2]; break;
-                }
-
-            }
+            string userDepartment = RolesService.GetCurrentUser(userName).Department;
 
             Guid NLevelNumberParamGuid = LevelNumberParam.Guid; //N_Эт.Номер
 
@@ -286,6 +277,50 @@ namespace TNovUtilsAR
 
 
             bool unhandledError = false;
+            #region Настройка параметра
+            //отдельной транзакцией: перерасчет модели после изменения назначения параметра выполняется один раз
+            //и сохраняется, даже если основная транзакция будет отменена
+            bool needBinding = viewModel.other;
+            bool needVary = elemsToWork.Any(t => t.elem.GroupId != ElementId.InvalidElementId);
+            if (needBinding || needVary)
+            {
+                using (Transaction setupTransaction = new Transaction(doc))
+                {
+                    try
+                    {
+                        setupTransaction.Start("TNov - Эт.Номер: настройка параметра");
+                        FailureCatcher.Attach(setupTransaction);
+                        bool changed = false;
+                        //назначение параметра новым категориям (Устройства вызова и оповещения, Ребра плит)
+                        if (needBinding)
+                        {
+                            List<string> addedCats = LevelNumberParam.EnsureBinding(doc, LevelNumberParam.AutoBindCategories, out string bindError);
+                            if (addedCats.Count > 0) { changed = true; Logger.Log("Параметр N_Эт.Номер добавлен к категориям: " + String.Join(", ", addedCats), 3); }
+                            if (bindError != null) Logger.Log(bindError, 4);
+                        }
+                        //у элементов в группах параметр доступен, только если разрешены разные значения по экземплярам групп
+                        if (needVary && LevelNumberParam.AllowVaryBetweenGroups(doc))
+                        {
+                            changed = true;
+                            Logger.Log("Для N_Эт.Номер включено 'Значения могут отличаться у экземпляров групп'", 3);
+                        }
+                        if (changed)
+                        {
+                            Logger.Log("Commit настройки параметра", 1);
+                            setupTransaction.Commit();
+                            Logger.Log("Настройка параметра сохранена", 1);
+                        }
+                        else setupTransaction.RollBack();
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log("Ошибка настройки параметра N_Эт.Номер: " + ex.Message, 4);
+                        if (setupTransaction.HasStarted() && !setupTransaction.HasEnded()) setupTransaction.RollBack();
+                    }
+                }
+            }
+            #endregion
+
             #region Основной код
             using (Transaction transaction = new Transaction(doc))
             {
@@ -293,17 +328,7 @@ namespace TNovUtilsAR
                 {
                     transaction.Start("TNov - Эт.Номер");
                     Logger.Log("Открываем транзакцию", 1);
-
-                    //назначение параметра новым категориям (Устройства вызова и оповещения, Ребра плит)
-                    if (viewModel.other)
-                    {
-                        List<string> addedCats = LevelNumberParam.EnsureBinding(doc, LevelNumberParam.AutoBindCategories, out string bindError);
-                        if (addedCats.Count > 0) { doc.Regenerate(); Logger.Log("Параметр N_Эт.Номер добавлен к категориям: " + String.Join(", ", addedCats), 3); }
-                        if (bindError != null) Logger.Log(bindError, 4);
-                    }
-                    //у элементов в группах параметр доступен, только если разрешены разные значения по экземплярам групп
-                    if (elemsToWork.Any(t => t.elem.GroupId != ElementId.InvalidElementId) && LevelNumberParam.AllowVaryBetweenGroups(doc))
-                        Logger.Log("Для N_Эт.Номер включено 'Значения могут отличаться у экземпляров групп'", 3);
+                    FailureCatcher.Attach(transaction, HideProgressBar); //ошибки при Commit: в лог, прогресс-бар скрыть, чтобы не перекрывал окно Revit
 
                     Thread thread = new Thread(new ThreadStart(this.ThreadStartingPoint));
                     thread.SetApartmentState(ApartmentState.STA);
@@ -356,6 +381,8 @@ namespace TNovUtilsAR
                         this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<double>((Func<double>)(() => this.levnumProgressBar.TNov_ProgressBar.Value = (double)PBCount));
                         this.levnumProgressBar.TNov_ProgressBar.Dispatcher.Invoke<string>((Func<string>)(() => this.levnumProgressBar.value.Text = PBCount.ToString()));
                     }
+                    Logger.Log("Commit транзакции", 1);
+                    this.levnumProgressBar.Dispatcher.Invoke(new Action(() => this.levnumProgressBar.info.Text = "Revit применяет изменения, это может занять несколько минут..."));
                     transaction.Commit();
                     Logger.Log("Закрываем транзакцию.", 1);
                 }
@@ -400,6 +427,16 @@ namespace TNovUtilsAR
             }
             Logger.Log("Завершение работы.",5);
             return Result.Succeeded;
+        }
+        private void HideProgressBar()
+        {
+            if (levnumProgressBar != null &&
+                levnumProgressBar.Dispatcher != null &&
+                !levnumProgressBar.Dispatcher.HasShutdownStarted)
+            {
+                //синхронно: окно должно скрыться до показа окна ошибки Revit
+                levnumProgressBar.Dispatcher.Invoke(new Action(() => levnumProgressBar.Hide()));
+            }
         }
         private void CloseProgressBarSafely()
         {
