@@ -21,6 +21,13 @@
     <Compile Remove="Авторазмеры\**\*.cs" />
   </ItemGroup>
 
+  <!-- Редактор окон (WindowEditor/, namespace WindowEditor), перенесён из отдельной
+       надстройки; его #if REVIT2024_OR_GREATER (ElementId.Value) включаем для R2027.
+       Кнопки ленты — в TNov/Application.cs (своё App.cs не переносилось). -->
+  <PropertyGroup Condition="'$(Configuration)' == 'R2027'">
+    <DefineConstants>$(DefineConstants);REVIT2024_OR_GREATER</DefineConstants>
+  </PropertyGroup>
+
   <!-- ===== Версионирование ===== -->
   <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
     <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(ProjectDir)UpdateVersion.ps1&quot;" />

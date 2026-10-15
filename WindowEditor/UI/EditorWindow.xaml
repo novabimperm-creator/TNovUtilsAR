@@ -1,0 +1,169 @@
+<Window x:Class="WindowEditor.UI.EditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Редактор окна" Width="1180" Height="760" MinWidth="900" MinHeight="560"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResizeWithGrip"
+        FontFamily="Segoe UI" FontSize="13" Background="#F4F5F7">
+    <Window.Resources>
+        <Style TargetType="TextBox">
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="Padding" Value="8,0"/>
+        </Style>
+        <Style TargetType="TextBlock" x:Key="Hdr">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,10,0,4"/>
+        </Style>
+        <Style TargetType="TextBlock" x:Key="Lbl">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,8,6"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="10">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="360"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Холст -->
+        <Border Grid.Column="0" Grid.Row="0" Background="White" BorderBrush="#D0D3D9" BorderThickness="1" Margin="0,0,10,0">
+            <Canvas x:Name="Sheet" ClipToBounds="True" Background="White" Focusable="True"
+                    MouseLeftButtonDown="Sheet_MouseDown" MouseMove="Sheet_MouseMove"
+                    MouseLeftButtonUp="Sheet_MouseUp" SizeChanged="Sheet_SizeChanged"/>
+        </Border>
+        <TextBlock Grid.Column="0" Grid.Row="1" Foreground="#666" Margin="0,6,10,0" TextWrapping="Wrap"
+                   Text="Вид с фасада. Клик — поле, створка (по её профилю), импост или рама секции. Тянуть импост — шаг 5 мм. V / H — импост рамы, Shift+V / Shift+H — импост в створке, Del — удалить, Ctrl+Z — отмена. Цифры в кружках — номера стёкол."/>
+
+        <!-- Панель справа -->
+        <TabControl Grid.Column="1" Grid.Row="0" x:Name="Tabs" SelectionChanged="Tabs_SelectionChanged">
+
+            <TabItem Header="Схема">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Hdr}" Margin="0,0,0,4" Text="Семейство"/>
+                        <TextBox x:Name="FamilyNameBox"/>
+                        <CheckBox x:Name="SaveAsNewBox" Content="Сохранить как новое семейство" Margin="0,0,0,6"/>
+                        <CheckBox x:Name="EmptyBox" Content="Пустой проём (без рамы)" Margin="0,0,0,6" Click="EmptyBox_Click"
+                                  ToolTip="Без рамы, створок и стёкол. Откосы, подоконные доски и отливы включаются на вкладке «Комплектация»."/>
+                        <UniformGrid Columns="2">
+                            <Button Content="Имя по схеме" Click="NameByCode_Click" Margin="0,0,4,6"
+                                    ToolTip="Код: ряды снизу вверх, в каждом — число створок и глухих полей, у которых там низ"/>
+                            <Button Content="⇋ Отразить Л/П" Click="Mirror_Click" Margin="4,0,0,6"
+                                    ToolTip="Зеркальный вариант: порядок ячеек, стороны петель, откосы, имя Левое ↔ Правое"/>
+                        </UniformGrid>
+
+                        <TextBlock Style="{StaticResource Hdr}" Text="Шаблон"/>
+                        <ComboBox x:Name="PresetBox" SelectionChanged="PresetBox_SelectionChanged"/>
+
+                        <TextBlock Style="{StaticResource Hdr}" x:Name="SectionHeader" Text="Секция"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                            <StackPanel>
+                                <TextBlock x:Name="SecWidthLabel" Text="Ширина рамы"/>
+                                <TextBox x:Name="SecWidthBox" LostFocus="Section_Commit" KeyDown="Box_KeyDown"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock x:Name="SecHeightLabel" Text="Высота рамы"/>
+                                <TextBox x:Name="SecHeightBox" LostFocus="Section_Commit" KeyDown="Box_KeyDown"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="1">
+                                <TextBlock Text="Низ проёма над низшим" ToolTip="Для окна рядом с балконной дверью — высота подоконной части стены"/>
+                                <TextBox x:Name="SecRaiseBox" LostFocus="Section_Commit" KeyDown="Box_KeyDown"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="1" Grid.Column="2">
+                                <TextBlock Text="Зазор снизу"/>
+                                <TextBox x:Name="SecGapBottomBox" LostFocus="Section_Commit" KeyDown="Box_KeyDown"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="2">
+                                <TextBlock Text="Зазор над стеной" ToolTip="Под частью рамы, стоящей на подоконной части стены (ячейка «Стена»)"/>
+                                <TextBox x:Name="SecGapStepBox" LostFocus="Section_Commit" KeyDown="Box_KeyDown"/>
+                            </StackPanel>
+                        </Grid>
+                        <UniformGrid Columns="2">
+                            <Button Content="+ Секция справа" Click="AddSection_Click" Margin="0,0,4,6"/>
+                            <Button x:Name="RemoveSectionBtn" Content="Удалить секцию" Click="RemoveSection_Click" Margin="4,0,0,6"/>
+                        </UniformGrid>
+
+                        <StackPanel x:Name="ImpostPanel">
+                        <TextBlock Style="{StaticResource Hdr}" Text="Импосты"/>
+                        <UniformGrid Columns="2">
+                            <Button Content="│ Вертикальный (V)" Click="AddV_Click" Margin="0,0,4,6"/>
+                            <Button Content="─ Горизонтальный (H)" Click="AddH_Click" Margin="4,0,0,6"/>
+                            <Button Content="│ В створке (Shift+V)" Click="AddSashV_Click" Margin="0,0,4,6"
+                                    ToolTip="Импост внутри створки: створка остаётся одна, делится заполнение"/>
+                            <Button Content="─ В створке (Shift+H)" Click="AddSashH_Click" Margin="4,0,0,6"
+                                    ToolTip="Например, дверь: стекло сверху, панель снизу"/>
+                        </UniformGrid>
+                        <Button x:Name="RemoveBtn" Content="Удалить импост (Del)" Click="Remove_Click"/>
+                        </StackPanel>
+
+                        <TextBlock Style="{StaticResource Hdr}" x:Name="SelHeader" Text="Выделение"/>
+                        <StackPanel x:Name="LeafPanel" Visibility="Collapsed">
+                            <TextBlock Text="Заполнение"/>
+                            <ComboBox x:Name="FillBox" SelectionChanged="FillBox_SelectionChanged"/>
+                            <TextBlock x:Name="InfillLabel" Text="Заполнение поля"/>
+                            <ComboBox x:Name="InfillBox" SelectionChanged="InfillBox_SelectionChanged">
+                                <ComboBoxItem Content="Стекло (стеклопакет)"/>
+                                <ComboBoxItem Content="Панель (глухая, непрозрачная)"/>
+                            </ComboBox>
+                            <TextBlock x:Name="GlassLabel" Text="Материал стекла"/>
+                            <ComboBox x:Name="GlassMatBox" IsEditable="True" LostFocus="GlassMat_Commit" SelectionChanged="GlassMat_Changed"/>
+                            <TextBlock x:Name="LeafSizeText" Foreground="#555"/>
+                        </StackPanel>
+                        <StackPanel x:Name="MullionPanel" Visibility="Collapsed">
+                            <TextBlock x:Name="MullionAxisLabel" Text="Ось импоста, мм"/>
+                            <TextBox x:Name="MullionAxisBox" LostFocus="MullionAxis_Commit" KeyDown="Box_KeyDown"/>
+                        </StackPanel>
+
+                        <TextBlock Style="{StaticResource Hdr}" Text="Итоги"/>
+                        <TextBlock x:Name="SummaryText" TextWrapping="Wrap" Foreground="#333"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="Проём">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+                    <Grid x:Name="OpeningGrid">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="200"/><ColumnDefinition/>
+                        </Grid.ColumnDefinitions>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="Комплектация">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+                    <StackPanel x:Name="KitPanel"/>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="Материалы">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+                    <StackPanel x:Name="MatPanel"/>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <StackPanel Grid.Column="1" Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="Отмена" Width="90" Margin="0,0,8,0" IsCancel="True" Click="Cancel_Click"/>
+            <Button Content="Применить в Revit" Width="150" Margin="0" Click="Ok_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
