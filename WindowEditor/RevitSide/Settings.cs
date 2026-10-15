@@ -27,11 +27,15 @@ namespace WindowEditor.RevitSide
             File.WriteAllText(FilePath, JsonConvert.SerializeObject(d, Formatting.Indented));
 
         /// <summary>
-        /// Шаблон окна WE_Окно.rfa (см. TEMPLATE.md). Если не задан — берётся %AppData%\WindowEditor\WE_Окно.rfa,
-        /// иначе спрашивает и запоминает.
+        /// Шаблон окна WE_Окно.rfa (см. TEMPLATE.md): из общей папки библиотеки (WindowParams.LibraryDir), если она
+        /// доступна; иначе сохранённый путь, %AppData%\WindowEditor\WE_Окно.rfa или вопрос пользователю.
         /// </summary>
         public static string GetTemplate()
         {
+            // общий шаблон библиотеки — всегда, независимо от сохранённого пути
+            var shared = WindowParams.LibraryFile("WE_Окно.rfa");
+            if (shared != null) return shared;
+
             var d = Load();
             if (IsFamily(d.WindowTemplate) && File.Exists(d.WindowTemplate)) return d.WindowTemplate;
 

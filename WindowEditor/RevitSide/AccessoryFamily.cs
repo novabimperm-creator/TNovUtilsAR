@@ -26,9 +26,26 @@ namespace WindowEditor.RevitSide
 
         public static string FilePath => Path.Combine(AppDataDir(), Name + ".rfa");
 
-        /// <summary>Путь к файлу семейства; при первом вызове создаёт его. Вызывать вне транзакций.</summary>
+        static string _shared; // общий файл библиотеки, уже проверенный в этом сеансе
+
+        /// <summary>
+        /// Путь к файлу семейства: из общей папки библиотеки (WindowParams.LibraryDir), если там файл текущего вида;
+        /// иначе локальный в %AppData% — при первом вызове создаётся или приводится к текущему виду. Общий файл
+        /// не переписываем. Вызывать вне транзакций.
+        /// </summary>
         public static string Ensure(Application app)
         {
+            if (_shared != null) return _shared;
+            var shared = LibraryFile(Name + ".rfa");
+            if (shared != null)
+            {
+                var sd = app.OpenDocumentFile(shared);
+                bool ok;
+                try { ok = Conforms(sd); }
+                finally { sd.Close(false); }
+                if (ok) return _shared = shared;
+            }
+
             if (File.Exists(FilePath)) { Upgrade(app); return FilePath; }
 
             var template = Settings.GetGenericTemplate(app.FamilyTemplatePath);

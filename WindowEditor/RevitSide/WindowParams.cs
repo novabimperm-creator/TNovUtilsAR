@@ -117,6 +117,23 @@ namespace WindowEditor.RevitSide
         public static FamilyParameter EnsureFamilyParam(FamilyManager fm, string name, ForgeTypeId group, ForgeTypeId spec, bool isInstance)
             => fm.get_Parameter(name) ?? fm.AddParameter(name, group, spec, isInstance);
 
+        /// <summary>
+        /// Общая папка библиотеки редактора: шаблон окна WE_Окно.rfa и семейство комплектации «WE_Элемент окна».
+        /// Прописана здесь, не в TNovConfig: файлы из неё важнее локальных и сохранённых в настройках.
+        /// </summary>
+        public const string LibraryDir = @"\\fs-nova\nova\04_БИБЛИОТЕКА\BIM\АР_Семейства\Окна\template";
+
+        /// <summary>Файл из общей папки библиотеки, если он доступен; иначе null.</summary>
+        public static string LibraryFile(string fileName)
+        {
+            try
+            {
+                var p = Path.Combine(LibraryDir, fileName);
+                return File.Exists(p) ? p : null;
+            }
+            catch (Exception) { return null; } // нет сети/доступа — работаем с локальными файлами
+        }
+
         public static string SharedFilePath() => Path.Combine(AppDataDir(), "WindowEditor_SharedParams.txt");
 
         public static string AppDataDir()
