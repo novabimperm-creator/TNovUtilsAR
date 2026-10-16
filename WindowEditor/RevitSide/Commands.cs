@@ -55,18 +55,16 @@ namespace WindowEditor.RevitSide
             }
 
             // отзеркаленные экземпляры этого семейства
-            bool? extPos = legacy ? (bool?)null : cfg.ExteriorPositiveY;
-            var issues = MirrorCheck.Find(doc, MirrorCheck.InstancesOf(doc, family), _ => extPos);
+            var issues = MirrorCheck.Find(MirrorCheck.InstancesOf(doc, family));
             var choice = MirrorCheck.Report(uidoc, issues, $"Семейство «{family.Name}»", allowContinue: true);
             if (choice == MirrorCheck.Choice.Selected || choice == MirrorCheck.Choice.Cancel) return Result.Cancelled;
 
             SyncWithHostWall(inst, cfg, legacy);
-            ReadMaterialsBack(doc, symbol, cfg);
 
             if (family.GetFamilySymbolIds().Count > 1)
                 TaskDialog.Show("Редактор окна",
                     $"В семействе «{family.Name}» несколько типов. Редактор ведёт правило «одно окно — одно семейство — один тип» " +
-                    "(имя «имя_ШхВ»): в семействе останется только тип выбранного окна, геометрия изменится у всех его типов. " +
+                    "(семейство «имя_ШхВ», тип «имя_ШхВ_цвет рамы»): в семействе останется только тип выбранного окна, геометрия изменится у всех его типов. " +
                     "Для отдельного окна включите «Сохранить как новое семейство».");
 
             var win = new EditorWindow(cfg, family.Name, canSaveAsNew: true, materials: ProjectMaterials(doc));
@@ -76,6 +74,7 @@ namespace WindowEditor.RevitSide
             // имя семейства и типа — «имя_ШхВ»: смена размера переименовывает это же семейство,
             // новое семейство — только если изменилось само имя или включено «Сохранить как новое»
             string name = win.FamilyName;
+            string typeName = Mirror.TypeName(name, win.Config.FrameMaterial); // + цвет рамы
             bool asNew = win.SaveAsNew || Mirror.StripSize(name) != Mirror.StripSize(family.Name);
             var taken = new FilteredElementCollector(doc).OfClass(typeof(Family)).Cast<Family>()
                 .FirstOrDefault(f => f.Name == name && f.Id != family.Id);
@@ -89,14 +88,14 @@ namespace WindowEditor.RevitSide
                 var app = data.Application.Application;
                 var famDoc = doc.EditFamily(family);
                 string saveAs = asNew ? name : null;
-                if (!asNew && symbol.Name != name)
+                if (!asNew && symbol.Name != typeName)
                 {
                     // типы при перезагрузке сопоставляются по имени — переименовываем тип заранее,
                     // иначе экземпляры остались бы на старом типе со старыми значениями
                     using (var t = new Transaction(doc, "Имя типа окна"))
                     {
                         t.Start();
-                        symbol.Name = name;
+                        symbol.Name = typeName;
                         t.Commit();
                     }
                 }
@@ -109,9 +108,9 @@ namespace WindowEditor.RevitSide
                     famDoc = TemplateBuilder.OpenCopy(app, template);
                     saveAs = saveAs ?? family.Name;
                 }
-                var newSymbol = FamilyLoader.BuildAndLoad(app, doc, famDoc, win.Config, name, saveAs);
+                var newSymbol = FamilyLoader.BuildAndLoad(app, doc, famDoc, win.Config, typeName, saveAs);
 
-                if (newSymbol == null) throw new InvalidOperationException($"После загрузки не найден тип «{name}».");
+                if (newSymbol == null) throw new InvalidOperationException($"После загрузки не найден тип «{typeName}».");
                 if (asNew) TrySwapType(doc, inst, newSymbol);
                 // семейство после перезагрузки — новый объект: берём его у типа, а не прежний family
                 var fam = newSymbol.Family;
@@ -137,7 +136,7 @@ namespace WindowEditor.RevitSide
             }
         }
 
-        /// <summary>Толщина стены и сторона фасада — по стене, в которой стоит окно.</summary>
+        /// <summary>Толщина стены (и четверть для чужих окон) — по стене, в которой стоит окно.</summary>
         static void SyncWithHostWall(FamilyInstance inst, WindowConfig cfg, bool legacy)
         {
             if (!(inst.Host is Wall wall)) return;
@@ -155,9 +154,6 @@ namespace WindowEditor.RevitSide
 
             if (legacy)
             {
-                // Для нового окна сторону фасада определяем по стене; у окон редактора не трогаем — её мог поправить пользователь.
-                cfg.ExteriorPositiveY = inst.FacingOrientation.DotProduct(wall.Orientation) > 0;
-
                 // Четверть по умолчанию — толщина наружного слоя, если слоёв больше одного
                 var cs = wall.WallType.GetCompoundStructure();
                 if (cs != null && cs.LayerCount > 1)
@@ -165,18 +161,6 @@ namespace WindowEditor.RevitSide
                     double outer = WindowParams.Mm(cs.GetLayerWidth(0));
                     if (outer >= 50 && outer < t / 2) { cfg.QuarterDepth = Math.Round(outer); cfg.QuarterSide = 65; cfg.QuarterTop = 65; }
                 }
-            }
-        }
-
-        /// <summary>Материалы, изменённые в проекте через параметры типа WE_Мат.*, возвращаем в конфигурацию.</summary>
-        static void ReadMaterialsBack(Document doc, FamilySymbol symbol, WindowConfig cfg)
-        {
-            var geo = new WindowGeometry(cfg);
-            foreach (var slot in geo.Materials)
-            {
-                var p = symbol.LookupParameter(slot.Param);
-                if (p == null || p.StorageType != StorageType.ElementId) continue;
-                if (doc.GetElement(p.AsElementId()) is Material m && m.Name != slot.Get()) slot.Set(m.Name);
             }
         }
 
@@ -217,10 +201,10 @@ namespace WindowEditor.RevitSide
             var doc = uidoc.Document;
             var windows = new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance)).Cast<FamilyInstance>()
                 .Where(EditWindowCommand.IsWindow).ToList();
-            var issues = MirrorCheck.Find(doc, windows, MirrorCheck.ExteriorResolver());
+            var issues = MirrorCheck.Find(windows);
             if (issues.Count == 0)
             {
-                TaskDialog.Show("Редактор окна", $"Проверено окон: {windows.Count}. Отзеркаленных и развёрнутых нет.");
+                TaskDialog.Show("Редактор окна", $"Проверено окон: {windows.Count}. Отзеркаленных нет.");
                 return Result.Succeeded;
             }
             MirrorCheck.Report(uidoc, issues, "Модель", allowContinue: false);
@@ -256,7 +240,7 @@ namespace WindowEditor.RevitSide
                     Settings.ResetTemplate(); // в следующий раз спросим другой файл
                     throw;
                 }
-                // одно семейство — один тип, имя типа = имя семейства «имя_ШхВ»
+                // одно семейство «имя_ШхВ» — один тип «имя_ШхВ_цвет рамы»
                 var name = win.FamilyName;
                 if (new FilteredElementCollector(doc).OfClass(typeof(Family)).Any(f => f.Name == name))
                 {
@@ -264,7 +248,7 @@ namespace WindowEditor.RevitSide
                     message = $"Семейство «{name}» уже есть в проекте. Измените имя окна или отредактируйте существующее.";
                     return Result.Failed;
                 }
-                symbol = FamilyLoader.BuildAndLoad(app, doc, famDoc, win.Config, name, name);
+                symbol = FamilyLoader.BuildAndLoad(app, doc, famDoc, win.Config, Mirror.TypeName(name, win.Config.FrameMaterial), name);
             }
             catch (Exception ex)
             {
@@ -346,6 +330,7 @@ namespace WindowEditor.RevitSide
                 ElementId wallId, instId;
                 using (var t = new Transaction(doc, "Временное окно"))
                 {
+                    Silent(t);
                     t.Start();
                     var level = new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().OrderBy(l => l.Elevation).First();
                     var wallType = new FilteredElementCollector(doc).OfClass(typeof(WallType)).Cast<WallType>().First(w => w.Kind == WallKind.Basic);
@@ -358,7 +343,7 @@ namespace WindowEditor.RevitSide
                     if (!sym.IsActive) sym.Activate();
                     var inst = doc.Create.NewFamilyInstance(p0 + XYZ.BasisX * WindowParams.Ft(10000), sym, wall, level, Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
                     wallId = wall.Id; instId = inst.Id;
-                    t.Commit();
+                    if (t.Commit() != TransactionStatus.Committed) { tg.RollBack(); return; } // не вышло — без прогрева
                 }
 
                 // перезагрузка «из редактора семейств»: документ помечаем изменённым, иначе Revit может её пропустить
@@ -382,11 +367,32 @@ namespace WindowEditor.RevitSide
 
                 using (var t = new Transaction(doc, "Удалить временное окно"))
                 {
+                    Silent(t);
                     t.Start();
                     doc.Delete(new List<ElementId> { instId, wallId });
                     t.Commit();
                 }
                 tg.Assimilate();
+            }
+        }
+
+        /// <summary>Без диалогов: предупреждения скрыть, при ошибке — тихо откатить транзакцию.</summary>
+        static void Silent(Transaction t)
+        {
+            var o = t.GetFailureHandlingOptions();
+            o.SetFailuresPreprocessor(new SilentFailures());
+            o.SetClearAfterRollback(true);
+            t.SetFailureHandlingOptions(o);
+        }
+
+        class SilentFailures : IFailuresPreprocessor
+        {
+            public FailureProcessingResult PreprocessFailures(FailuresAccessor fa)
+            {
+                fa.DeleteAllWarnings();
+                return fa.GetFailureMessages().Any(m => m.GetSeverity() == FailureSeverity.Error)
+                    ? FailureProcessingResult.ProceedWithRollBack
+                    : FailureProcessingResult.Continue;
             }
         }
     }

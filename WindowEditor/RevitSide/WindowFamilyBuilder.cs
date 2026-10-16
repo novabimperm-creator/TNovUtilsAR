@@ -27,6 +27,10 @@ namespace WindowEditor.RevitSide
         const string SubGlass = "WE_Стекло";
         const string SubPanel = "WE_Панель";
         const string SubSymbol = "WE_Схема открывания";
+        const string SubZone = "WE_Зона открывания";
+        const string ZoneParam = "WE_Зона открывания";      // видимость зон открывания (да/нет, тип)
+        const string ZoneMaterial = "WE_Зона открывания";   // прозрачный, как «N Воздух» в каталоге
+        const double TiltDeg = 10;                          // откидывание в разрезе
 
         readonly Document _doc;
         readonly Application _app;
@@ -37,7 +41,7 @@ namespace WindowEditor.RevitSide
         double _anchorY;       // её положение по Y в семействе
         double _anchorDepth;   // её глубина от наружной грани стены по схеме, мм
         readonly Dictionary<string, Category> _subcats = new Dictionary<string, Category>();
-        readonly Dictionary<string, FamilyParameter> _matParams = new Dictionary<string, FamilyParameter>();
+        readonly Dictionary<string, ElementId> _mats = new Dictionary<string, ElementId>();
 
         public WindowFamilyBuilder(Application app, Document familyDoc, WindowConfig cfg)
         {
@@ -53,6 +57,10 @@ namespace WindowEditor.RevitSide
         {
             using (var t = new Transaction(_doc, "Генерация окна"))
             {
+                // предупреждения Revit при генерации пользователю не показываем
+                var opts = t.GetFailureHandlingOptions();
+                opts.SetFailuresPreprocessor(new HideWarnings());
+                t.SetFailureHandlingOptions(opts);
                 t.Start();
                 var fm = _doc.FamilyManager;
                 _geo = new WindowGeometry(_cfg);
@@ -93,7 +101,11 @@ namespace WindowEditor.RevitSide
                 _sillZ = FindSillZ();
                 fm.Set(EnsureFamilyParam(fm, SillZ, GroupTypeId.Data, SpecTypeId.Length, false), _sillZ);
 
+                // стена-основа семейства — толщиной из схемы: тогда неподвижная геометрия (2D-линии открывания)
+                // совпадает с рамой в стене этой толщины, и Revit одинаково ставит экземпляры при любой загрузке
+                AdjustHostWall();
                 // пустоты шаблона — по контуру проёма; плоскость «Четверть» встаёт до выбора привязки
+                // (запись параметров заодно заставляет Revit перерешить плоскости после смены толщины стены)
                 TemplateBuilder.SetVoids(_doc, _geo, _cfg);
                 fm.Set(fm.get_Parameter(GenVoids), "");
                 _doc.Regenerate();
@@ -116,6 +128,27 @@ namespace WindowEditor.RevitSide
         double X(double x) => C.X(x);
         double Z(double z) => C.Z(z);
         XYZ P(double x, double z) => new XYZ(X(x), _anchorY, Z(z));
+
+        /// <summary>Толщина стены-основы в семействе = толщине из схемы (меняем самый толстый слой).</summary>
+        void AdjustHostWall()
+        {
+            try
+            {
+                var wall = new FilteredElementCollector(_doc).OfClass(typeof(Wall)).Cast<Wall>().FirstOrDefault();
+                var cs = wall?.WallType.GetCompoundStructure();
+                if (cs == null) return;
+                var layers = cs.GetLayers();
+                double total = layers.Sum(l => l.Width), target = Ft(_cfg.WallThickness);
+                if (Math.Abs(total - target) < 1e-6) return;
+                int idx = Enumerable.Range(0, layers.Count).OrderByDescending(i => layers[i].Width).First();
+                double w = layers[idx].Width + (target - total);
+                if (w <= Ft(1)) return;
+                cs.SetLayerWidth(idx, w);
+                wall.WallType.SetCompoundStructure(cs);
+                _doc.Regenerate();
+            }
+            catch (Exception) { /* не критично: 2D-линии открывания лягут по толщине стены шаблона */ }
+        }
 
         /// <summary>
         /// Опорная плоскость шаблона, от которой отсчитывается рама, — по привязке схемы. Глубины схемы (от наружной
@@ -145,8 +178,8 @@ namespace WindowEditor.RevitSide
         {
             var c = _cfg;
             double d0 = c.BlockFromExterior, d1 = d0 + c.FrameDepth, mid = (d0 + d1) / 2;
-            var frameMat = _matParams["WE_Мат. Рама"];
-            _matParams.TryGetValue("WE_Мат. Створки", out var sashMat);
+            var frameMat = _mats["WE_Мат. Рама"];
+            _mats.TryGetValue("WE_Мат. Створки", out var sashMat);
 
             const double rebate = 12; // заход стекла в фальц
             foreach (var sg in _geo.Sections)
@@ -158,17 +191,17 @@ namespace WindowEditor.RevitSide
                 foreach (var u in lay.Units.Where(u => u.Cell.IsSash))
                 {
                     var inner = u.R.Inset(c.SashWidth);
-                    Solid(new[] { u.R, inner }, mid - c.SashDepth / 2, mid + c.SashDepth / 2, SubSash, sashMat ?? frameMat);
-                    OpeningSymbol(inner, u.Cell.Fill);
+                    var sash = Solid(new[] { u.R, inner }, mid - c.SashDepth / 2, mid + c.SashDepth / 2, SubSash, sashMat != null && sashMat != ElementId.InvalidElementId ? sashMat : frameMat);
+                    OpeningGraphics(sash, u.R, inner, u.Cell.Fill, mid + c.SashDepth / 2);
                 }
                 // импосты внутри створок
                 foreach (var m in lay.Mullions.Where(m => m.InSash))
-                    Solid(new[] { m.R }, mid - c.SashDepth / 2, mid + c.SashDepth / 2, SubSash, sashMat ?? frameMat);
+                    Solid(new[] { m.R }, mid - c.SashDepth / 2, mid + c.SashDepth / 2, SubSash, sashMat != null && sashMat != ElementId.InvalidElementId ? sashMat : frameMat);
 
                 foreach (var f in lay.Fields)
                 {
                     var pane = _geo.Panes.First(p => p.Cell == f.Cell);
-                    var mat = _matParams[pane.MaterialParam];
+                    var mat = _mats[pane.MaterialParam];
                     double th = pane.IsPanel ? c.PanelThickness : c.GlassThickness;
                     Solid(new[] { f.R.Inset(-rebate) }, mid - th / 2, mid + th / 2, pane.IsPanel ? SubPanel : SubGlass, mat);
                 }
@@ -185,7 +218,7 @@ namespace WindowEditor.RevitSide
         }
 
         /// <summary>Выдавливание по профилю на фасадной плоскости. loops[0] — внешний контур, остальные — отверстия.</summary>
-        Extrusion Solid(MRect[] loops, double dFrom, double dTo, string subcat, FamilyParameter mat)
+        Extrusion Solid(MRect[] loops, double dFrom, double dTo, string subcat, ElementId mat)
         {
             var profile = new CurveArrArray();
             foreach (var r in loops)
@@ -199,7 +232,7 @@ namespace WindowEditor.RevitSide
         }
 
         /// <summary>Выдавливание по многоугольникам (внешние контуры и отверстия) — для рамы сложной формы.</summary>
-        Extrusion SolidPoly(List<List<(double x, double z)>> loops, double dFrom, double dTo, string subcat, FamilyParameter mat)
+        Extrusion SolidPoly(List<List<(double x, double z)>> loops, double dFrom, double dTo, string subcat, ElementId mat)
         {
             var profile = new CurveArrArray();
             foreach (var l in loops) if (l.Count >= 3) profile.Append(Loop(l));
@@ -233,70 +266,205 @@ namespace WindowEditor.RevitSide
             return arr;
         }
 
-        void Associate(Element e, FamilyParameter mat)
+        void Associate(Element e, ElementId mat)
         {
-            if (mat == null) return;
-            var p = e.get_Parameter(BuiltInParameter.MATERIAL_ID_PARAM);
-            if (p != null) _doc.FamilyManager.AssociateElementParameterToFamilyParameter(p, mat);
-        }
-
-        void OpeningSymbol(MRect g, FillKind f)
-        {
-            var style = _subcats[SubSymbol].GetGraphicsStyle(GraphicsStyleType.Projection);
-            void Seg(double x1, double z1, double x2, double z2)
-            {
-                var c = _doc.FamilyCreate.NewSymbolicCurve(Line.CreateBound(P(x1, z1), P(x2, z2)), _anchor);
-                c.LineStyle = style;
-            }
-            void Tri(double ax, double az, double bx, double bz, double cx, double cz) { Seg(ax, az, bx, bz); Seg(bx, bz, cx, cz); }
-
-            bool left = f == FillKind.TurnLeft || f == FillKind.TiltTurnLeft || f == FillKind.DoorLeft || f == FillKind.DoorTiltLeft;
-            bool right = f == FillKind.TurnRight || f == FillKind.TiltTurnRight || f == FillKind.DoorRight || f == FillKind.DoorTiltRight;
-            bool tilt = f == FillKind.Tilt || f == FillKind.TiltTurnLeft || f == FillKind.TiltTurnRight || f == FillKind.DoorTiltLeft || f == FillKind.DoorTiltRight;
-            double midZ = g.Y + g.H / 2, midX = g.X + g.W / 2;
-            if (left) Tri(g.Right, g.Top, g.X, midZ, g.Right, g.Y);
-            if (right) Tri(g.X, g.Top, g.Right, midZ, g.X, g.Y);
-            if (tilt) Tri(g.X, g.Top, midX, g.Y, g.Right, g.Top);
+            if (mat == null || mat == ElementId.InvalidElementId) return;
+            e.get_Parameter(BuiltInParameter.MATERIAL_ID_PARAM)?.Set(mat);
         }
 
         // =====================================================================
-        // Материалы: параметр типа на каждый элемент и каждое стекло
+        // Открывание: 3D-линии, зона открывания, 2D в плане и в разрезе (как в каталоге pmN.Окно v3)
+        // =====================================================================
+
+        /// <summary>
+        /// Для открывающейся створки. outer — створка, inner — её заполнение (по нему треугольники), dIn — глубина
+        /// внутренней грани створки от наружной грани стены (мм, по схеме). Вершина треугольника — сторона петель.
+        ///  • 3D-линии — модельные, на эскизе, привязанном к внутренней грани тела створки: идут за створкой при
+        ///    любой толщине стены; видны в 3D и на фасадах, в плане и сбоку скрыты.
+        ///  • Зона открывания — тело поворота створки на 90° внутрь вокруг петель (поворотные и дверные), прозрачная,
+        ///    только в 3D; видимость — параметр «WE_Зона открывания».
+        ///  • План — линия створки и дуга (как у дверей каталога): грубо — створка под 30° без дуги, средне/высоко —
+        ///    под 90° с дугой. Разрез (виды «Слева/Справа») — откидывание на 10°.
+        ///    2D-линии плана и разреза нельзя привязать к плоскостям шаблона — они от внутренней грани стены по толщине из схемы.
+        /// </summary>
+        void OpeningGraphics(Extrusion sash, MRect outer, MRect inner, FillKind f, double dIn)
+        {
+            bool left = f == FillKind.TurnLeft || f == FillKind.TiltTurnLeft || f == FillKind.DoorLeft || f == FillKind.DoorTiltLeft;
+            bool right = f == FillKind.TurnRight || f == FillKind.TiltTurnRight || f == FillKind.DoorRight || f == FillKind.DoorTiltRight;
+            bool tilt = f == FillKind.Tilt || f == FillKind.TiltTurnLeft || f == FillKind.TiltTurnRight || f == FillKind.DoorTiltLeft || f == FillKind.DoorTiltRight;
+            if (!left && !right && !tilt) return;
+
+            var face = sash == null ? null : InteriorFace(sash);
+            var style = _subcats[SubSymbol].GetGraphicsStyle(GraphicsStyleType.Projection);
+
+            // ---- 3D-линии открывания ----
+            if (face != null)
+            {
+                var sp = SketchPlane.Create(_doc, face.Reference);
+                double fy = face.Origin.Y;
+                XYZ F(double x, double z) => new XYZ(X(x), fy, Z(z));
+                var vis = new FamilyElementVisibility(FamilyElementVisibilityType.Model)
+                {
+                    IsShownInFrontBack = true, IsShownInLeftRight = false, IsShownInTopBottom = false,
+                    IsShownInCoarse = true, IsShownInMedium = true, IsShownInFine = true
+                };
+                void Seg(double x1, double z1, double x2, double z2)
+                {
+                    var mc = _doc.FamilyCreate.NewModelCurve(Line.CreateBound(F(x1, z1), F(x2, z2)), sp);
+                    mc.LineStyle = style;
+                    mc.SetVisibility(vis);
+                }
+                void Tri(double ax, double az, double bx, double bz, double cx, double cz) { Seg(ax, az, bx, bz); Seg(bx, bz, cx, cz); }
+                var g = inner;
+                double midZ = g.Y + g.H / 2, midX = g.X + g.W / 2;
+                if (left) Tri(g.Right, g.Top, g.X, midZ, g.Right, g.Y);
+                if (right) Tri(g.X, g.Top, g.Right, midZ, g.X, g.Y);
+                if (tilt) Tri(g.X, g.Top, midX, g.Y, g.Right, g.Top);
+
+                // ---- зона открывания ----
+                if (left || right) OpeningZone(sp, fy, outer, left);
+            }
+
+            // ---- 2D: план и разрез ----
+            // Символьные линии не привязать к плоскостям шаблона: они неподвижны в координатах семейства. Стена-основа
+            // семейства подогнана под толщину из схемы (AdjustHostWall), поэтому при такой стене в проекте линии точно
+            // на створке; в стене другой толщины сдвинутся на половину разницы.
+            double yIn = _anchorY - Ft(dIn - _anchorDepth); // в помещение — −Y
+            if (left || right) PlanSwing(outer, left, yIn, style);
+            if (tilt) SectionTilt(outer, yIn, style);
+        }
+
+        /// <summary>Внутренняя (со стороны помещения, −Y) грань тела створки — с ссылкой для эскиза.</summary>
+        PlanarFace InteriorFace(Extrusion ext)
+        {
+            _doc.Regenerate();
+            var opt = new Options { ComputeReferences = true };
+            PlanarFace best = null;
+            foreach (var go in ext.get_Geometry(opt))
+                if (go is Solid s)
+                    foreach (Autodesk.Revit.DB.Face fc in s.Faces)
+                        if (fc is PlanarFace pf && pf.Reference != null && Math.Abs(Math.Abs(pf.FaceNormal.Y) - 1) < 1e-6
+                            && (best == null || pf.Origin.Y < best.Origin.Y))
+                            best = pf;
+            return best;
+        }
+
+        void OpeningZone(SketchPlane sp, double fy, MRect r, bool hingeLeft)
+        {
+            XYZ F(double x, double z) => new XYZ(X(x), fy, Z(z));
+            var loop = new CurveArray();
+            loop.Append(Line.CreateBound(F(r.X, r.Y), F(r.Right, r.Y)));
+            loop.Append(Line.CreateBound(F(r.Right, r.Y), F(r.Right, r.Top)));
+            loop.Append(Line.CreateBound(F(r.Right, r.Top), F(r.X, r.Top)));
+            loop.Append(Line.CreateBound(F(r.X, r.Top), F(r.X, r.Y)));
+            var prof = new CurveArrArray(); prof.Append(loop);
+            double hx = hingeLeft ? r.X : r.Right;
+            var axis = Line.CreateBound(F(hx, r.Y), F(hx, r.Top)); // вверх, +Z
+            // Направление поворота у Revit зависит от ориентации эскиза — строим четверть оборота, проверяем,
+            // что зона ушла в помещение (−Y), иначе берём другую четверть.
+            Revolution rev = null;
+            foreach (var (a0, a1) in new[] { (0.0, 0.5 * Math.PI), (1.5 * Math.PI, 2 * Math.PI) })
+            {
+                Revolution r0;
+                try { r0 = _doc.FamilyCreate.NewRevolution(true, prof, sp, axis, a0, a1); }
+                catch (Exception) { continue; }
+                _doc.Regenerate();
+                var bb = r0.get_BoundingBox(null);
+                if (bb != null && bb.Max.Y <= fy + Ft(1)) { rev = r0; break; }
+                _doc.Delete(r0.Id);
+            }
+            if (rev == null) return; // зона — вспомогательная, без неё окно всё равно строится
+            rev.Subcategory = _subcats[SubZone];
+            Associate(rev, WindowMaterials.GetOrCreate(_doc, ZoneMaterial));
+            rev.SetVisibility(new FamilyElementVisibility(FamilyElementVisibilityType.Model)
+            {
+                IsShownInFrontBack = false, IsShownInLeftRight = false, IsShownInTopBottom = false,
+                IsShownInCoarse = true, IsShownInMedium = true, IsShownInFine = true
+            });
+            var fm = _doc.FamilyManager;
+            var vp = fm.get_Parameter(ZoneParam);
+            if (vp == null)
+            {
+                vp = fm.AddParameter(ZoneParam, GroupTypeId.Visibility, SpecTypeId.Boolean.YesNo, false);
+                fm.Set(vp, 1);
+            }
+            var ip = rev.get_Parameter(BuiltInParameter.IS_VISIBLE_PARAM);
+            if (ip != null) fm.AssociateElementParameterToFamilyParameter(ip, vp);
+        }
+
+        SketchPlane _planSp, _sideSp;
+
+        static FamilyElementVisibility ViewVis(bool coarse, bool medium, bool fine) =>
+            new FamilyElementVisibility(FamilyElementVisibilityType.ViewSpecific)
+            { IsShownInCoarse = coarse, IsShownInMedium = medium, IsShownInFine = fine };
+
+        void PlanSwing(MRect r, bool hingeLeft, double yIn, GraphicsStyle style)
+        {
+            if (_planSp == null)
+            {
+                var sill = new FilteredElementCollector(_doc).OfClass(typeof(ReferencePlane)).Cast<ReferencePlane>()
+                    .First(p => p.Name == TemplateBuilder.PlaneSill);
+                _planSp = SketchPlane.Create(_doc, sill.Id);
+            }
+            double z = _planSp.GetPlane().Origin.Z;
+            double hx = X(hingeLeft ? r.X : r.Right), fx = X(hingeLeft ? r.Right : r.X);
+            double len = Math.Abs(fx - hx), sx = Math.Sign(fx - hx);
+            var hinge = new XYZ(hx, yIn, z);
+            var closed = new XYZ(fx, yIn, z);
+            var open90 = new XYZ(hx, yIn - len, z);
+            double c30 = Math.Cos(Math.PI / 6), s30 = Math.Sin(Math.PI / 6);
+            var open30 = new XYZ(hx + sx * len * c30, yIn - len * s30, z);
+            var mid45 = new XYZ(hx + sx * len * Math.Cos(Math.PI / 4), yIn - len * Math.Sin(Math.PI / 4), z);
+
+            void Add(Curve c, FamilyElementVisibility v)
+            {
+                var sc = _doc.FamilyCreate.NewSymbolicCurve(c, _planSp);
+                sc.LineStyle = style;
+                sc.SetVisibility(v);
+            }
+            Add(Line.CreateBound(hinge, open30), ViewVis(true, false, false));
+            Add(Line.CreateBound(hinge, open90), ViewVis(false, true, true));
+            Add(Arc.Create(open90, closed, mid45), ViewVis(false, true, true));
+        }
+
+        readonly HashSet<string> _sectionDone = new HashSet<string>();
+
+        void SectionTilt(MRect r, double yIn, GraphicsStyle style)
+        {
+            // все створки рисуются в одной боковой плоскости — одинаковые по высоте совпали бы
+            if (!_sectionDone.Add($"{Math.Round(r.Y)}|{Math.Round(r.H)}")) return;
+            if (_sideSp == null)
+                _sideSp = SketchPlane.Create(_doc, Plane.CreateByNormalAndOrigin(XYZ.BasisX, XYZ.Zero));
+            double z0 = Z(r.Y), h = Ft(r.H), a = TiltDeg * Math.PI / 180;
+            var hinge = new XYZ(0, yIn, z0);
+            var closedTop = new XYZ(0, yIn, z0 + h);
+            var openTop = new XYZ(0, yIn - h * Math.Sin(a), z0 + h * Math.Cos(a));
+            var mid = new XYZ(0, yIn - h * Math.Sin(a / 2), z0 + h * Math.Cos(a / 2));
+            void Add(Curve c, FamilyElementVisibility v)
+            {
+                var sc = _doc.FamilyCreate.NewSymbolicCurve(c, _sideSp);
+                sc.LineStyle = style;
+                sc.SetVisibility(v);
+            }
+            Add(Line.CreateBound(hinge, openTop), ViewVis(true, true, true));
+            Add(Arc.Create(closedTop, openTop, mid), ViewVis(false, true, true));
+        }
+
+        // =====================================================================
+        // Материалы: назначаются телам напрямую, без параметров типа — менять только в редакторе
         // =====================================================================
 
         void SetupMaterials(FamilyManager fm)
         {
-            var wanted = new HashSet<string>(_geo.Materials.Select(m => m.Param));
-            // убрать параметры исчезнувших элементов (и старые параметры v1)
+            // параметры материалов прошлых версий (WE_Мат. …, v1) убираем: материал меняется только в редакторе
             foreach (var p in fm.Parameters.Cast<FamilyParameter>().ToList())
             {
                 var n = p.Definition.Name;
-                if ((n.StartsWith(MatPrefix) && !wanted.Contains(n)) || n == "WE_Материал рамы" || n == "WE_Материал стекла")
+                if (n.StartsWith(MatPrefix) || n == "WE_Материал рамы" || n == "WE_Материал стекла")
                     fm.RemoveParameter(p);
             }
             foreach (var slot in _geo.Materials)
-            {
-                var fp = EnsureFamilyParam(fm, slot.Param, GroupTypeId.Materials, SpecTypeId.Reference.Material, false);
-                var id = MaterialId(slot.Get());
-                if (id != ElementId.InvalidElementId) fm.Set(fp, id);
-                _matParams[slot.Param] = fp;
-            }
-        }
-
-        /// <summary>Материал по имени; если в семействе нет — создаётся. В проекте при загрузке приоритет у одноимённого материала проекта.</summary>
-        ElementId MaterialId(string name)
-        {
-            if (string.IsNullOrWhiteSpace(name)) return ElementId.InvalidElementId;
-            var m = new FilteredElementCollector(_doc).OfClass(typeof(Material)).Cast<Material>().FirstOrDefault(x => x.Name == name);
-            if (m != null) return m.Id;
-            var id = Material.Create(_doc, name);
-            var mat = (Material)_doc.GetElement(id);
-            var low = name.ToLowerInvariant();
-            if (low.Contains("стекл") || low.Contains("glass"))
-            {
-                mat.Color = new Color(190, 220, 235);
-                mat.Transparency = 70;
-            }
-            return id;
+                _mats[slot.Param] = WindowMaterials.GetOrCreate(_doc, slot.Get());
         }
 
         // =====================================================================
@@ -306,12 +474,16 @@ namespace WindowEditor.RevitSide
         void PrepareSubcategories()
         {
             var parent = _doc.OwnerFamily.FamilyCategory;
-            foreach (var name in new[] { SubFrame, SubSash, SubGlass, SubPanel, SubSymbol })
+            foreach (var name in new[] { SubFrame, SubSash, SubGlass, SubPanel, SubSymbol, SubZone })
             {
                 Category sub = null;
                 foreach (Category c in parent.SubCategories) if (c.Name == name) { sub = c; break; }
                 _subcats[name] = sub ?? _doc.Settings.Categories.NewSubcategory(parent, name);
             }
+            // зона открывания — как в каталоге: прозрачный материал, белые линии
+            var zone = _subcats[SubZone];
+            zone.Material = (Material)_doc.GetElement(WindowMaterials.GetOrCreate(_doc, ZoneMaterial));
+            zone.LineColor = new Color(254, 254, 254);
         }
 
         void DeleteGenerated(FamilyManager fm)
@@ -319,8 +491,9 @@ namespace WindowEditor.RevitSide
             var ids = new List<ElementId>();
             foreach (var f in new FilteredElementCollector(_doc).OfClass(typeof(GenericForm)).Cast<GenericForm>())
                 if (f.IsSolid && f.Subcategory != null && f.Subcategory.Name.StartsWith("WE_")) ids.Add(f.Id);
-            foreach (var c in new FilteredElementCollector(_doc).OfClass(typeof(CurveElement)).OfType<SymbolicCurve>())
-                if (c.LineStyle != null && c.LineStyle.Name.StartsWith("WE_")) ids.Add(c.Id);
+            // свои линии — символьные (план, разрез) и модельные (3D-открывание)
+            foreach (var c in new FilteredElementCollector(_doc).OfClass(typeof(CurveElement)).Cast<CurveElement>())
+                if ((c is SymbolicCurve || c is ModelCurve) && c.LineStyle != null && c.LineStyle.Name.StartsWith("WE_")) ids.Add(c.Id);
             foreach (var fi in new FilteredElementCollector(_doc).OfClass(typeof(FamilyInstance)).Cast<FamilyInstance>())
                 if (fi.Symbol.Family.Name == AccessoryFamily.Name) ids.Add(fi.Id);
             // прямоугольный проём из шаблона заменяется пустотами
@@ -449,6 +622,15 @@ namespace WindowEditor.RevitSide
                 return Math.Abs((fm.CurrentType.AsDouble(p) ?? double.NaN) - expected) < 1e-6;
             }
             catch (Exception) { return false; }
+        }
+
+        class HideWarnings : IFailuresPreprocessor
+        {
+            public FailureProcessingResult PreprocessFailures(FailuresAccessor fa)
+            {
+                fa.DeleteAllWarnings();
+                return FailureProcessingResult.Continue;
+            }
         }
 
         static void SetDouble(FamilyManager fm, FamilyParameter p, double v, string label)

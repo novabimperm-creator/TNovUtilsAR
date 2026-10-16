@@ -60,6 +60,52 @@ namespace WindowEditor.UI
             (FillKind.Wall, "Стена (вне рамы)"),
         };
 
+        /// <summary>Цвета чертежа: под светлую или тёмную тему TNov (по фону карточки).</summary>
+        sealed class Palette
+        {
+            public Brush Ink, Wall, Frame, Sash, Glass, GlassCustom, Panel, PanelLine, Opening, Quarter,
+                OuterSill, InnerSill, CornerPost, Text, Muted, TextBg, Badge, Accent, AccentFill, AccentFillLight, Error;
+
+            public static Palette For(FrameworkElement res)
+            {
+                Brush R(string key, Brush fallback) => res.TryFindResource(key) as Brush ?? fallback;
+                var card = R("CardBrush", Brushes.White) as SolidColorBrush;
+                var c = card?.Color ?? Colors.White;
+                bool dark = 0.299 * c.R + 0.587 * c.G + 0.114 * c.B < 128;
+                var accent = R("AccentBrush", Rgb(0x1B, 0x8A, 0x4A));
+                var ac = (accent as SolidColorBrush)?.Color ?? Colors.Green;
+                var p = new Palette
+                {
+                    Accent = accent,
+                    AccentFill = new SolidColorBrush(Color.FromArgb(40, ac.R, ac.G, ac.B)),
+                    AccentFillLight = new SolidColorBrush(Color.FromArgb(28, ac.R, ac.G, ac.B)),
+                    Text = R("PrimaryTextBrush", Brushes.Black),
+                    Muted = R("MutedBrush", Brushes.DimGray),
+                    Error = R("ElementErrorBrush", Brushes.Firebrick),
+                    Badge = Rgb(0x2F, 0x5F, 0x8A),
+                };
+                if (dark)
+                {
+                    p.Ink = Rgb(0xD5, 0xE0, 0xDA); p.Wall = Rgb(0x4A, 0x46, 0x3E); p.Frame = Rgb(0x5C, 0x69, 0x63);
+                    p.Sash = Rgb(0x4B, 0x57, 0x51); p.Glass = Rgb(0x2E, 0x58, 0x6E); p.GlassCustom = Rgb(0x3A, 0x63, 0x48);
+                    p.Panel = Rgb(0x6A, 0x69, 0x62); p.PanelLine = Rgb(0x90, 0x8F, 0x86); p.Opening = Rgb(0x14, 0x20, 0x1A);
+                    p.Quarter = Rgb(0xC8, 0xA0, 0x60); p.OuterSill = Rgb(0x7A, 0x82, 0x8C); p.InnerSill = Rgb(0xA0, 0xA8, 0xA4);
+                    p.CornerPost = Rgb(0x6E, 0x76, 0x80); p.TextBg = new SolidColorBrush(Color.FromArgb(190, c.R, c.G, c.B));
+                }
+                else
+                {
+                    p.Ink = Rgb(0x33, 0x38, 0x40); p.Wall = Rgb(0xE8, 0xE2, 0xD8); p.Frame = Rgb(0xE6, 0xE8, 0xEC);
+                    p.Sash = Rgb(0xF2, 0xF3, 0xF5); p.Glass = Rgb(0xD6, 0xEB, 0xF7); p.GlassCustom = Rgb(0xC4, 0xDD, 0xC8);
+                    p.Panel = Rgb(0xD9, 0xD9, 0xD4); p.PanelLine = Rgb(0xA0, 0xA0, 0x98); p.Opening = Brushes.White;
+                    p.Quarter = Rgb(0x8A, 0x6D, 0x3B); p.OuterSill = Rgb(0x9A, 0xA1, 0xAB); p.InnerSill = Rgb(0x70, 0x70, 0x70);
+                    p.CornerPost = Rgb(0xC9, 0xCD, 0xD4); p.TextBg = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255));
+                }
+                return p;
+            }
+        }
+
+        readonly Palette _pal;
+
         class NumField
         {
             public TextBox Box;
@@ -73,6 +119,7 @@ namespace WindowEditor.UI
         public EditorWindow(WindowConfig cfg, string familyName, bool canSaveAsNew, IEnumerable<string> materials)
         {
             InitializeComponent();
+            _pal = Palette.For(this);
             Config = cfg?.Clone() ?? Presets.Create(Presets.IndexOf("v3 12"));
             _materials = (materials ?? Enumerable.Empty<string>()).Where(m => !string.IsNullOrWhiteSpace(m))
                 .Distinct().OrderBy(m => m).ToList();
@@ -81,12 +128,12 @@ namespace WindowEditor.UI
             SaveAsNewBox.Visibility = canSaveAsNew ? Visibility.Visible : Visibility.Collapsed;
 
             _loading = true;
-            PresetBox.Items.Add("— выбрать —");
-            foreach (var n in Presets.Names) PresetBox.Items.Add(n);
-            PresetBox.SelectedIndex = 0;
             foreach (var f in Fills) FillBox.Items.Add(f.name);
+            // новое окно начинается с выбора шаблона, правка существующего — со схемы
+            Tabs.SelectedItem = canSaveAsNew ? SchemeTab : StartTab;
             _loading = false;
 
+            BuildStartTab();
             BuildOpeningTab();
             Relayout();
             PreviewKeyDown += OnPreviewKeyDown;
@@ -124,6 +171,7 @@ namespace WindowEditor.UI
             Redraw();
             UpdateSchemePanel();
             LoadOpeningFields();
+            TitleInfo.Text = FamilyName;
             if (rebuildTabs) RebuildCurrentDynamicTab();
         }
 
@@ -391,15 +439,110 @@ namespace WindowEditor.UI
             Relayout();
         }
 
-        void PresetBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        // =====================================================================
+        // Вкладка «Старт»: шаблоны схем миниатюрами
+        // =====================================================================
+
+        void BuildStartTab()
         {
-            if (_loading || PresetBox.SelectedIndex <= 0) return;
+            var host = StartPanel;
+            host.Children.Clear();
+            host.Children.Add(new TextBlock
+            {
+                Style = (Style)FindResource("Muted"), Margin = new Thickness(0, 2, 0, 4),
+                Text = "Выберите схему — дальше её можно менять на вкладке «Схема». Профиль, проём, материалы и комплектация текущего окна сохраняются."
+            });
+            string group = null;
+            WrapPanel wrap = null;
+            for (int i = 0; i < Presets.Names.Length; i++)
+            {
+                var name = Presets.Names[i];
+                var g = name.Contains("Балк") || name.Contains("Дверь") ? "Балконные двери и блоки" : "Окна";
+                if (g != group)
+                {
+                    group = g;
+                    host.Children.Add(new TextBlock { Style = (Style)FindResource("Hdr"), Text = g });
+                    wrap = new WrapPanel();
+                    host.Children.Add(wrap);
+                }
+                int index = i;
+                var tile = new Button { Style = (Style)FindResource("PresetTile"), ToolTip = name };
+                var stack = new StackPanel();
+                stack.Children.Add(Thumbnail(Presets.Create(index, Config), 100, 86));
+                stack.Children.Add(new TextBlock
+                {
+                    Text = name, FontSize = 11, Margin = new Thickness(0, 4, 0, 0), Foreground = _pal.Text,
+                    TextAlignment = TextAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis
+                });
+                tile.Content = stack;
+                tile.Click += (s, e) => ApplyPreset(index);
+                wrap.Children.Add(tile);
+            }
+        }
+
+        void ApplyPreset(int index)
+        {
             PushUndo();
-            Config = Presets.Create(PresetBox.SelectedIndex - 1, Config);
+            Config = Presets.Create(index, Config);
             _selSection = 0;
             ClearSelection();
+            Tabs.SelectedItem = SchemeTab;
             Relayout();
-            _loading = true; PresetBox.SelectedIndex = 0; _loading = false;
+            Sheet.Focus();
+        }
+
+        /// <summary>Миниатюра схемы: проём, рамы, створки со знаками открывания.</summary>
+        Canvas Thumbnail(WindowConfig cfg, double w, double h)
+        {
+            var cv = new Canvas { Width = w, Height = h, ClipToBounds = true, IsHitTestVisible = false };
+            WindowGeometry geo;
+            try { geo = new WindowGeometry(cfg); } catch { return cv; }
+            double ow = Math.Max(1, geo.OpeningWidth), oh = Math.Max(1, geo.OpeningHeight);
+            double s = Math.Min((w - 8) / ow, (h - 8) / oh);
+            double ox = (w - ow * s) / 2, oy = (h + oh * s) / 2;
+            Point P(double x, double z) => new Point(ox + x * s, oy - z * s);
+            void Rect(MRect r, Brush fill, Brush stroke, double th)
+            {
+                var e = new Rectangle { Width = Math.Max(0, r.W * s), Height = Math.Max(0, r.H * s), Fill = fill, Stroke = stroke, StrokeThickness = th };
+                var p = P(r.X, r.Top); Canvas.SetLeft(e, p.X); Canvas.SetTop(e, p.Y); cv.Children.Add(e);
+            }
+            void Line2(double x1, double z1, double x2, double z2, Brush b, double th)
+            {
+                var a = P(x1, z1); var c = P(x2, z2);
+                cv.Children.Add(new Line { X1 = a.X, Y1 = a.Y, X2 = c.X, Y2 = c.Y, Stroke = b, StrokeThickness = th });
+            }
+
+            var core = new Polygon { Fill = _pal.Opening, Stroke = _pal.Ink, StrokeThickness = 0.8 };
+            foreach (var p in WindowGeometry.Polygon(geo.Core)) core.Points.Add(P(p.x, p.z));
+            cv.Children.Add(core);
+            if (cfg.EmptyOpening) return cv;
+            foreach (var sg in geo.Sections)
+            {
+                var lay = sg.Layout;
+                var pg = new PathGeometry { FillRule = FillRule.EvenOdd };
+                foreach (var l in lay.FrameLoops)
+                {
+                    var fig = new PathFigure { StartPoint = P(l[0].x, l[0].z), IsClosed = true, IsFilled = true };
+                    for (int k = 1; k < l.Count; k++) fig.Segments.Add(new LineSegment(P(l[k].x, l[k].z), true));
+                    pg.Figures.Add(fig);
+                }
+                cv.Children.Add(new Path { Data = pg, Fill = _pal.Frame, Stroke = _pal.Ink, StrokeThickness = 0.6 });
+                foreach (var u in lay.Units.Where(u => u.Cell.IsSash)) Rect(u.R, _pal.Sash, _pal.Ink, 0.5);
+                foreach (var f in lay.Fields) Rect(f.R, f.Cell.IsPanel ? _pal.Panel : _pal.Glass, _pal.Ink, 0.4);
+                foreach (var u in lay.Units.Where(u => u.Cell.IsSash))
+                    OpeningSymbol(u.R.Inset(cfg.SashWidth), u.Cell.Fill, (x1, z1, x2, z2) => Line2(x1, z1, x2, z2, _pal.Ink, 0.6));
+            }
+            return cv;
+        }
+
+        void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left && e.ButtonState == MouseButtonState.Pressed) DragMove();
+        }
+
+        void FamilyNameBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_geo != null) TitleInfo.Text = FamilyName;
         }
 
         void MullionAxis_Commit(object sender, RoutedEventArgs e)
@@ -484,7 +627,7 @@ namespace WindowEditor.UI
             Grid.SetRow(_cornerLeadBox, row++); Grid.SetColumnSpan(_cornerLeadBox, 2); g.Children.Add(_cornerLeadBox);
             Num("Угловой соединитель", () => c().CornerPostSize, v => c().CornerPostSize = v, 20, "Сторона квадрата реального углового соединителя, мм");
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            _cornerText = new TextBlock { Foreground = Brushes.DimGray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) };
+            _cornerText = new TextBlock { Foreground = _pal.Muted, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) };
             Grid.SetRow(_cornerText, row++); Grid.SetColumnSpan(_cornerText, 2); g.Children.Add(_cornerText);
 
             Header("Монтажные зазоры (низ — у секции)");
@@ -496,7 +639,7 @@ namespace WindowEditor.UI
             Num("Верхняя", () => c().QuarterTop, v => c().QuarterTop = v);
             Num("Глубина", () => c().QuarterDepth, v => c().QuarterDepth = v, 0, "Обычно толщина наружного слоя стены");
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            _overlapText = new TextBlock { Foreground = Brushes.DimGray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) };
+            _overlapText = new TextBlock { Foreground = _pal.Muted, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) };
             Grid.SetRow(_overlapText, row++); Grid.SetColumnSpan(_overlapText, 2); g.Children.Add(_overlapText);
 
             Header("Профиль");
@@ -532,9 +675,9 @@ namespace WindowEditor.UI
                 g.Children.Add(label); g.Children.Add(ctrl);
             }
 
-            _depthCanvas = new Canvas { Height = 190, Background = Brushes.White, ClipToBounds = true, Margin = new Thickness(0, 0, 0, 6) };
+            _depthCanvas = new Canvas { Height = 190, Background = Brushes.Transparent, ClipToBounds = true };
             _depthCanvas.SizeChanged += (s, e) => DrawDepth();
-            Row(null, new Border { Child = _depthCanvas, BorderBrush = Rgb(0xD0, 0xD3, 0xD9), BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 0, 6) }, true);
+            Row(null, new Border { Child = _depthCanvas, Background = (Brush)FindResource("CardBrush"), CornerRadius = new CornerRadius(10), Padding = new Thickness(2), Margin = new Thickness(0, 0, 0, 8) }, true);
 
             _anchorBox = new ComboBox();
             foreach (var n in AnchorNames) _anchorBox.Items.Add(n);
@@ -552,7 +695,7 @@ namespace WindowEditor.UI
             Row(null, _anchorBox, true);
 
             // смещение: ◀ наружу, ▶ вглубь
-            var box = new TextBox { Margin = new Thickness(0) };
+            var box = new TextBox { Margin = new Thickness(4, 0, 4, 0) };
             var nf = new NumField { Box = box, Get = () => Config.FrameOffset, Set = v => Config.FrameOffset = v };
             box.LostFocus += (s, e) => CommitOpening(nf);
             box.KeyDown += (s, e) => { if (e.Key == Key.Enter) { CommitOpening(nf); Sheet.Focus(); } };
@@ -576,7 +719,7 @@ namespace WindowEditor.UI
             dock.Children.Add(left); dock.Children.Add(right); dock.Children.Add(box);
             Row(new TextBlock { Text = "Смещение: + вглубь, − наружу", Style = (Style)FindResource("Lbl"), TextWrapping = TextWrapping.Wrap }, dock);
 
-            _depthInfo = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) };
+            _depthInfo = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 12, Margin = new Thickness(0, 0, 0, 6) };
             Row(null, _depthInfo, true);
             rowRef = row;
         }
@@ -614,7 +757,7 @@ namespace WindowEditor.UI
                 Canvas.SetLeft(tb, x); Canvas.SetTop(tb, y); cv.Children.Add(tb);
             }
 
-            var wall = Rgb(0xE8, 0xE2, 0xD8); var ink = Rgb(0x33, 0x38, 0x40);
+            var wall = _pal.Wall; var ink = _pal.Ink;
             // стена с четвертью
             Box(0, t, -(H - yEdge) / s, 0, wall, ink);
             if (_geo.HasQuarter && c.QuarterDepth > 0) Box(0, Math.Min(c.QuarterDepth, t), 0, c.QuarterSide, wall, ink);
@@ -624,24 +767,24 @@ namespace WindowEditor.UI
             if (!c.EmptyOpening)
             {
                 // рама и стекло
-                Box(B, B + FD, gap, gap + c.FrameWidth, Rgb(0xE6, 0xE8, 0xEC), ink);
+                Box(B, B + FD, gap, gap + c.FrameWidth, _pal.Frame, ink);
                 double mid = B + FD / 2;
-                Box(mid - c.GlassThickness / 2, mid + c.GlassThickness / 2, gap + c.FrameWidth, gap + c.FrameWidth + 120, Rgb(0xD6, 0xEB, 0xF7), ink);
+                Box(mid - c.GlassThickness / 2, mid + c.GlassThickness / 2, gap + c.FrameWidth, gap + c.FrameWidth + 120, _pal.Glass, ink);
             }
             else
             {
-                var l = new Line { X1 = X(B), X2 = X(B), Y1 = Y(0), Y2 = Y(150), Stroke = Brushes.Gray, StrokeDashArray = new DoubleCollection { 4, 3 } };
+                var l = new Line { X1 = X(B), X2 = X(B), Y1 = Y(0), Y2 = Y(150), Stroke = _pal.Muted, StrokeDashArray = new DoubleCollection { 4, 3 } };
                 cv.Children.Add(l);
             }
-            if (rf.In.Enabled) Box(B + FD, t, 0, rf.In.Thickness, Rgb(0xF5, 0xF5, 0xF0), ink);
+            if (rf.In.Enabled) Box(B + FD, t, 0, rf.In.Thickness, _pal.Sash, ink);
             if (rf.Out.Enabled)
             {
                 double q = _geo.HasQuarter ? c.QuarterSide : 0;
                 double dEnd = _geo.HasQuarter && c.QuarterDepth > 0 ? Math.Min(c.QuarterDepth, B) : B;
-                Box(0, dEnd, q, q + rf.Out.Thickness, Rgb(0xF0, 0xEC, 0xE0), ink);
+                Box(0, dEnd, q, q + rf.Out.Thickness, _pal.Panel, ink);
             }
 
-            Text("улица", 4, 4, Brushes.Gray); Text("помещение", W - 70, 4, Brushes.Gray);
+            Text("улица", 6, 4, _pal.Muted); Text("помещение", W - 72, 4, _pal.Muted);
             // размеры: до рамы и после рамы
             double yd = H - 22;
             void Dim(double d0, double d1, string label)
@@ -673,7 +816,7 @@ namespace WindowEditor.UI
                 " Второе окно у угла — в соседней стене, с той же толщиной стены и положением рамы; «Угловое окно» выровняет оба и поставит узел.";
             _depthInfo.Text = $"От наружной грани до рамы: {Config.BlockFromExterior:0} мм, от рамы до внутренней грани: {Config.BlockToInterior:0} мм" +
                 (Config.BlockFromExterior < 0 || Config.BlockToInterior < 0 ? " — рама выходит из стены!" : "");
-            _depthInfo.Foreground = Config.BlockFromExterior < 0 || Config.BlockToInterior < 0 ? Brushes.Firebrick : Brushes.DimGray;
+            _depthInfo.Foreground = Config.BlockFromExterior < 0 || Config.BlockToInterior < 0 ? _pal.Error : _pal.Muted;
             DrawDepth();
             _overlapText.Text = _geo.HasQuarter
                 ? $"Заход рамы за четверть: {_geo.QuarterOverlap:0} мм{(_geo.QuarterOverlap < 10 ? " — мало, увеличьте четверть или уменьшите зазор" : "")}"
@@ -704,8 +847,8 @@ namespace WindowEditor.UI
 
         void RebuildCurrentDynamicTab()
         {
-            if (Tabs.SelectedIndex == 2) BuildKitTab();
-            else if (Tabs.SelectedIndex == 3) BuildMaterialsTab();
+            if (Tabs.SelectedItem == KitTab) BuildKitTab();
+            else if (Tabs.SelectedItem == MatTab) BuildMaterialsTab();
         }
 
         Grid KitGrid(StackPanel host, params string[] headers)
@@ -716,7 +859,7 @@ namespace WindowEditor.UI
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             for (int i = 0; i < headers.Length; i++)
             {
-                var t = new TextBlock { Text = headers[i], Foreground = Brushes.DimGray, FontSize = 11, Margin = new Thickness(4, 0, 4, 2) };
+                var t = new TextBlock { Text = headers[i], Foreground = _pal.Muted, FontSize = 11, Margin = new Thickness(4, 0, 4, 2) };
                 Grid.SetColumn(t, i); g.Children.Add(t);
             }
             host.Children.Add(g);
@@ -733,7 +876,7 @@ namespace WindowEditor.UI
 
         TextBox SmallNum(Func<double> get, Action<double> set, double min = 0)
         {
-            var b = new TextBox { Width = 44, Text = F(get()), Margin = new Thickness(0) };
+            var b = new TextBox { Width = 50, Text = F(get()), Margin = new Thickness(0) };
             void Commit()
             {
                 if (!TryNum(b.Text, out var v)) { b.Text = F(get()); return; }
@@ -772,7 +915,7 @@ namespace WindowEditor.UI
                 });
 
                 var g = KitGrid(host, "Элемент", "Вкл.", "Толщ.", "Вынос", "Под раму", "В стену");
-                AddCell(g, 1, 0, new TextBlock { Text = "Подоконник", ToolTip = "Подоконник внутренний", VerticalAlignment = VerticalAlignment.Center });
+                AddCell(g, 1, 0, new TextBlock { Text = "Подоконник", ToolTip = "Подоконник внутренний", Foreground = _pal.Text, VerticalAlignment = VerticalAlignment.Center });
                 AddCell(g, 1, 1, Check(() => s.SillIn.Enabled, v => s.SillIn.Enabled = v));
                 AddCell(g, 1, 2, SmallNum(() => s.SillIn.Thickness, v => s.SillIn.Thickness = v, 1));
                 AddCell(g, 1, 3, SmallNum(() => s.SillIn.Projection, v => s.SillIn.Projection = v));
@@ -797,7 +940,7 @@ namespace WindowEditor.UI
                     bool drip = s.OuterKind == OuterSillKind.Drip;
                     AddCell(g, 3, 0, new TextBlock
                     {
-                        Text = drip ? "Отлив" : "Наружный",
+                        Text = drip ? "Отлив" : "Наружный", Foreground = _pal.Text,
                         ToolTip = drip ? "Отлив" : "Подоконник наружный",
                         VerticalAlignment = VerticalAlignment.Center,
                         TextTrimming = TextTrimming.CharacterEllipsis
@@ -818,7 +961,7 @@ namespace WindowEditor.UI
                     (Config.Corner == CornerSide.Right && f.Kind == FaceKind.Right)) continue; // у угла стены нет — откоса нет
                 var rf = Config.RevealFor(f.Name);
                 bool hasExt = _geo.ExteriorFaces.Any(x => x.Name == f.Name);
-                AddCell(rg, row, 0, new TextBlock { Text = f.Name, VerticalAlignment = VerticalAlignment.Center });
+                AddCell(rg, row, 0, new TextBlock { Text = f.Name, Foreground = _pal.Text, VerticalAlignment = VerticalAlignment.Center });
                 AddCell(rg, row, 1, Check(() => rf.In.Enabled, v => rf.In.Enabled = v));
                 AddCell(rg, row, 2, SmallNum(() => rf.In.Thickness, v => rf.In.Thickness = v, 1));
                 if (hasExt)
@@ -830,8 +973,8 @@ namespace WindowEditor.UI
             }
             host.Children.Add(new TextBlock
             {
-                Text = "Размеры, мм. Подоконник и отлив ставятся под каждым участком низа рамы, кроме участков под дверью. Материалы — на вкладке «Материалы». Элементы ставятся в модель отдельными обобщёнными моделями «WE_Элемент окна» и обновляются кнопкой «Комплектация».",
-                TextWrapping = TextWrapping.Wrap, Foreground = Brushes.DimGray, Margin = new Thickness(0, 8, 0, 0)
+                Text = "Размеры, мм. Подоконник и отлив ставятся под каждым участком низа рамы, кроме участков под дверью. Материалы — на вкладке «Материалы». Элементы ставятся в модель отдельными семействами «WE_Элемент окна» (категория «Окна») и обновляются кнопкой «Комплектация».",
+                TextWrapping = TextWrapping.Wrap, Foreground = _pal.Muted, FontSize = 12, Margin = new Thickness(0, 8, 0, 0)
             });
         }
 
@@ -852,13 +995,13 @@ namespace WindowEditor.UI
             host.Children.Add(new TextBlock { Style = (Style)FindResource("Hdr"), Text = "Элементы окна" });
             foreach (var slot in _geo.Materials)
             {
-                host.Children.Add(new TextBlock { Text = slot.Title, Margin = new Thickness(0, 2, 0, 2) });
+                host.Children.Add(new TextBlock { Text = slot.Title, Foreground = _pal.Muted, FontSize = 12, Margin = new Thickness(0, 2, 0, 2) });
                 host.Children.Add(MaterialCombo(slot.Get, slot.Set));
             }
             host.Children.Add(new TextBlock
             {
-                Text = "Материалы ищутся в проекте по имени; если такого нет, создаётся новый. В проекте их можно менять и в свойствах типа (параметры «WE_Мат. …») — при следующем открытии редактор их подхватит.",
-                TextWrapping = TextWrapping.Wrap, Foreground = Brushes.DimGray, Margin = new Thickness(0, 8, 0, 0)
+                Text = "Материалы ищутся в проекте по имени; если такого нет, создаётся новый. Материалы зашиты в семейство и меняются только здесь, в редакторе.",
+                TextWrapping = TextWrapping.Wrap, Foreground = _pal.Muted, FontSize = 12, Margin = new Thickness(0, 8, 0, 0)
             });
         }
 
@@ -903,26 +1046,26 @@ namespace WindowEditor.UI
             _ox = Pad + ((cw - 2 * Pad) - (wx1 - _wx0) * _scale) / 2;
             _oy = ch - Pad - ((ch - 2 * Pad) - (wz1 - _wz0) * _scale) / 2;
 
-            var stroke = Rgb(0x33, 0x38, 0x40);
-            var wall = Rgb(0xE8, 0xE2, 0xD8);
-            var frameFill = Rgb(0xE6, 0xE8, 0xEC);
-            var sashFill = Rgb(0xF2, 0xF3, 0xF5);
-            var glass = Rgb(0xD6, 0xEB, 0xF7);
-            var accent = Rgb(0xE0, 0x6C, 0x1F);
+            var stroke = _pal.Ink;
+            var wall = _pal.Wall;
+            var frameFill = _pal.Frame;
+            var sashFill = _pal.Sash;
+            var glass = _pal.Glass;
+            var accent = _pal.Accent;
 
             // стена и проём
             // стена; со стороны угла здания стены нет — дальше видна соседняя стена под углом
             double wallX0 = Config.Corner == CornerSide.Left ? 0 : -wallM;
             double wallX1 = Config.Corner == CornerSide.Right ? _geo.OpeningWidth : _geo.OpeningWidth + wallM;
             AddRect(new MRect(wallX0, -wallM, wallX1 - wallX0, _geo.OpeningHeight + 2 * wallM), wall, null, 0);
-            AddPolygon(WindowGeometry.Polygon(_geo.Core), Brushes.White, stroke, 1, false);
-            if (_geo.HasQuarter) AddPolygon(WindowGeometry.Polygon(_geo.Exterior), null, Rgb(0x8A, 0x6D, 0x3B), 1.2, true);
+            AddPolygon(WindowGeometry.Polygon(_geo.Core), _pal.Opening, stroke, 1, false);
+            if (_geo.HasQuarter) AddPolygon(WindowGeometry.Polygon(_geo.Exterior), null, _pal.Quarter, 1.2, true);
 
             // наружные подоконники/отливы (видны с фасада) и внутренние (пунктиром)
             foreach (var b in _geo.Boxes.Where(b => b.Kind == "Отлив" || b.Kind == "Подоконник наружный"))
-                AddRect(new MRect(b.X0, b.Z0 - Math.Max(0, 25 - b.Thickness), b.X1 - b.X0, Math.Max(b.Thickness, 25)), Rgb(0x9A, 0xA1, 0xAB), stroke, 0.6);
+                AddRect(new MRect(b.X0, b.Z0 - Math.Max(0, 25 - b.Thickness), b.X1 - b.X0, Math.Max(b.Thickness, 25)), _pal.OuterSill, stroke, 0.6);
             foreach (var b in _geo.Boxes.Where(b => b.Kind == "Подоконник внутренний"))
-                AddRect(new MRect(b.X0, b.Z0, b.X1 - b.X0, b.Z1 - b.Z0), null, Rgb(0x70, 0x70, 0x70), 0.8, true);
+                AddRect(new MRect(b.X0, b.Z0, b.X1 - b.X0, b.Z1 - b.Z0), null, _pal.InnerSill, 0.8, true);
 
             foreach (var sg in _geo.Sections)
             {
@@ -942,7 +1085,7 @@ namespace WindowEditor.UI
                     if (u.Cell.IsWall)
                     {
                         var c0 = ToScreen(u.R.X + u.R.W / 2, u.R.Y + u.R.H / 2);
-                        AddText("стена", c0, 10, Brushes.Gray, false);
+                        AddText("стена", c0, 10, _pal.Muted, false);
                         continue;
                     }
                     if (u.Cell.IsSash) AddRect(u.R, sashFill, stroke, 0.8);
@@ -950,12 +1093,12 @@ namespace WindowEditor.UI
                 foreach (var f in lay.Fields)
                 {
                     var pane = _geo.Panes.First(p => p.Cell == f.Cell);
-                    var gl = f.Cell.IsPanel ? Rgb(0xD9, 0xD9, 0xD4)
-                           : string.IsNullOrEmpty(f.Cell.GlassMaterial) ? glass : Rgb(0xC4, 0xDD, 0xC8);
+                    var gl = f.Cell.IsPanel ? _pal.Panel
+                           : string.IsNullOrEmpty(f.Cell.GlassMaterial) ? glass : _pal.GlassCustom;
                     var pr = AddRect(f.R, gl, stroke, 0.6);
-                    if (f.Cell.IsPanel) AddRect(f.R.Inset(Math.Min(25, Math.Min(f.R.W, f.R.H) / 4)), null, Rgb(0xA0, 0xA0, 0x98), 0.6);
+                    if (f.Cell.IsPanel) AddRect(f.R.Inset(Math.Min(25, Math.Min(f.R.W, f.R.H) / 4)), null, _pal.PanelLine, 0.6);
                     var c = ToScreen(f.R.X + f.R.W / 2, f.R.Y + f.R.H / 2);
-                    AddText($"{f.R.W:0}×{f.R.H:0}", new Point(c.X, c.Y + 10), 10, Brushes.DimGray, true);
+                    AddText($"{f.R.W:0}×{f.R.H:0}", new Point(c.X, c.Y + 10), 10, _pal.Muted, true);
                     AddBadge(pane.Number.ToString(), new Point(c.X, c.Y - 10));
                 }
                 foreach (var u in lay.Units.Where(u => u.Cell.IsSash))
@@ -978,7 +1121,7 @@ namespace WindowEditor.UI
                 var post = _geo.CornerPostFacade;
                 if (post.HasValue)
                 {
-                    AddRect(post.Value, Rgb(0xC9, 0xCD, 0xD4), stroke, 1);
+                    AddRect(post.Value, _pal.CornerPost, stroke, 1);
                     var pc = ToScreen(post.Value.X + post.Value.W / 2, post.Value.Y + post.Value.H / 2);
                     var tb = AddText($"соединитель {Config.CornerPostSize:0}", pc, 9, stroke, true);
                     tb.RenderTransform = new RotateTransform(-90);
@@ -990,21 +1133,24 @@ namespace WindowEditor.UI
             if (_selCell == null && _selMullParent == null)
                 AddRect(_geo.Sections[_selSection].Block, null, accent, 2.5);
             var sf = SelField; var su = SelUnit;
-            if (sf != null && (su == null || sf.Cell != su.Cell || !su.Cell.IsSash)) AddRect(sf.R, Rgb(0xE0, 0x6C, 0x1F, 40), accent, 2.5);
-            else if (su != null) AddRect(su.R, Rgb(0xE0, 0x6C, 0x1F, 30), accent, 2.5);
+            if (sf != null && (su == null || sf.Cell != su.Cell || !su.Cell.IsSash)) AddRect(sf.R, _pal.AccentFill, accent, 2.5);
+            else if (su != null) AddRect(su.R, _pal.AccentFillLight, accent, 2.5);
             var sm = SelMullion;
             if (sm != null) AddRect(sm.R, accent, accent, 1);
 
             DrawDimensions(stroke);
         }
 
-        void DrawOpeningSymbol(MRect g, FillKind f, Brush stroke)
+        void DrawOpeningSymbol(MRect g, FillKind f, Brush stroke) =>
+            OpeningSymbol(g, f, (x1, z1, x2, z2) => AddLine(x1, z1, x2, z2, stroke, 0.8));
+
+        static void OpeningSymbol(MRect g, FillKind f, Action<double, double, double, double> line)
         {
             // вершина угла — сторона петель
             void Tri(double ax, double ay, double bx, double by, double cx, double cy)
             {
-                AddLine(ax, ay, bx, by, stroke, 0.8);
-                AddLine(bx, by, cx, cy, stroke, 0.8);
+                line(ax, ay, bx, by);
+                line(bx, by, cx, cy);
             }
             bool left = f == FillKind.TurnLeft || f == FillKind.TiltTurnLeft || f == FillKind.DoorLeft || f == FillKind.DoorTiltLeft;
             bool right = f == FillKind.TurnRight || f == FillKind.TiltTurnRight || f == FillKind.DoorRight || f == FillKind.DoorTiltRight;
@@ -1058,7 +1204,7 @@ namespace WindowEditor.UI
             Sheet.Children.Add(new Path { Data = geo, Fill = fill, Stroke = stroke, StrokeThickness = th, IsHitTestVisible = false });
         }
 
-        void Tick(Point p) => Sheet.Children.Add(new Line { X1 = p.X - 4, Y1 = p.Y + 4, X2 = p.X + 4, Y2 = p.Y - 4, Stroke = Brushes.Black, StrokeThickness = 1 });
+        void Tick(Point p) => Sheet.Children.Add(new Line { X1 = p.X - 4, Y1 = p.Y + 4, X2 = p.X + 4, Y2 = p.Y - 4, Stroke = _pal.Ink, StrokeThickness = 1 });
 
         Rectangle AddRect(MRect r, Brush fill, Brush stroke, double th, bool dashed = false)
         {
@@ -1091,7 +1237,7 @@ namespace WindowEditor.UI
         TextBlock AddText(string s, Point center, double size, Brush brush, bool bg)
         {
             var tb = new TextBlock { Text = s, FontSize = size, Foreground = brush, IsHitTestVisible = false };
-            if (bg) tb.Background = new SolidColorBrush(Color.FromArgb(200, 255, 255, 255));
+            if (bg) tb.Background = _pal.TextBg;
             tb.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             Canvas.SetLeft(tb, center.X - tb.DesiredSize.Width / 2);
             Canvas.SetTop(tb, center.Y - tb.DesiredSize.Height / 2);
@@ -1102,7 +1248,7 @@ namespace WindowEditor.UI
         void AddBadge(string s, Point center)
         {
             const double d = 18;
-            var e = new Ellipse { Width = d, Height = d, Fill = Rgb(0x2F, 0x5F, 0x8A), IsHitTestVisible = false };
+            var e = new Ellipse { Width = d, Height = d, Fill = _pal.Badge, IsHitTestVisible = false };
             Canvas.SetLeft(e, center.X - d / 2); Canvas.SetTop(e, center.Y - d / 2);
             Sheet.Children.Add(e);
             AddText(s, center, 10, Brushes.White, false);
@@ -1199,7 +1345,7 @@ namespace WindowEditor.UI
             if (Keyboard.FocusedElement is TextBox || Keyboard.FocusedElement is ComboBox) return;
             if (Config.EmptyOpening && e.Key != Key.Z) return;
             if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control) { Undo(); e.Handled = true; }
-            else if (Tabs.SelectedIndex != 0) return;
+            else if (Tabs.SelectedItem != SchemeTab) return;
             else if (e.Key == Key.V) { AddMullion(SplitKind.Columns, Keyboard.Modifiers == ModifierKeys.Shift); e.Handled = true; }
             else if (e.Key == Key.H) { AddMullion(SplitKind.Rows, Keyboard.Modifiers == ModifierKeys.Shift); e.Handled = true; }
             else if (e.Key == Key.Delete) { RemoveSelectedMullion(); e.Handled = true; }

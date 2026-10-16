@@ -238,15 +238,9 @@ namespace WindowEditor.RevitSide
             }
         }
 
-        /// <summary>Материал детали: из параметра типа окна WE_Мат.* (его могли поменять в проекте), иначе по имени.</summary>
-        static ElementId MaterialFor(Document doc, FamilySymbol windowType, Box b)
-        {
-            var p = string.IsNullOrEmpty(b.MaterialParam) ? null : windowType.LookupParameter(b.MaterialParam);
-            if (p != null && p.StorageType == StorageType.ElementId && p.AsElementId() != ElementId.InvalidElementId) return p.AsElementId();
-            if (string.IsNullOrEmpty(b.Material)) return null;
-            var m = new FilteredElementCollector(doc).OfClass(typeof(Material)).Cast<Material>().FirstOrDefault(x => x.Name == b.Material);
-            return m?.Id ?? Material.Create(doc, b.Material);
-        }
+        /// <summary>Материал детали — по имени из схемы окна (параметров материала у окна нет: меняется только в редакторе).</summary>
+        static ElementId MaterialFor(Document doc, FamilySymbol windowType, Box b) =>
+            string.IsNullOrEmpty(b.Material) ? null : WindowMaterials.GetOrCreate(doc, b.Material);
 
         static double Normalize(double a)
         {

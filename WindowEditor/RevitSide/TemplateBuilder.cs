@@ -423,8 +423,21 @@ namespace WindowEditor.RevitSide
             Set(CoreVoids, core);
             Set(ExtVoids, ext);
 
+            // После смены толщины стены-основы (AdjustHostWall) Revit в редакторе семейств двигает «Наружный/
+            // Внутренние», но не перерешает зависящие от них плоскости (четверть, запас) и даже переписывает их
+            // параметры под фактическое положение (запас становится 0). Пустоты тогда режут не всю стену.
+            // Помогает запись заведомо другого значения и обратно, с регенерацией между ними.
+            void Resolve(string param, double mm)
+            {
+                var p = fm.get_Parameter(param);
+                fm.Set(p, Ft(mm + 1));
+                doc.Regenerate(); // без регенерации между записями Revit считает, что ничего не изменилось
+                fm.Set(p, Ft(mm));
+            }
             // плоскость четверти нужна всегда (от неё идут обе пустоты); без четверти пустоты Н = О
-            fm.Set(fm.get_Parameter(PQuarterDepth), Ft(QuarterPlaneMm(cfg)));
+            Resolve(PQuarterDepth, QuarterPlaneMm(cfg));
+            Resolve(PMargin, MarginMm);
+            doc.Regenerate();
         }
 
         /// <summary>Глубина плоскости «Четверть» от наружной грани, мм: не меньше 1 мм и меньше толщины стены.</summary>

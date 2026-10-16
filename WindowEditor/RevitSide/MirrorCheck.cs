@@ -7,69 +7,29 @@ using WindowEditor.Model;
 
 namespace WindowEditor.RevitSide
 {
-    /// <summary>Экземпляр окна, который нельзя оставлять: отзеркален или стоит наружной стороной внутрь.</summary>
+    /// <summary>Отзеркаленный экземпляр окна.</summary>
     public class WindowIssue
     {
         public FamilyInstance Inst;
-        public bool Mirrored;   // в преобразовании есть отражение — петли и схема с фасада зеркальны
-        public bool WrongSide;  // наружная сторона семейства смотрит в помещение
         public bool InGroup => Inst.GroupId != ElementId.InvalidElementId;
     }
 
     /// <summary>
-    /// Поиск и исправление отзеркаленных окон.
-    /// Отражение определяется по матрице экземпляра (HasReflection) — так ловятся и «Зеркально», и стрелки «Отразить».
-    /// Сторона — по оси +Y семейства и наружной стороне стены (Wall.Orientation); нужна конфигурация окна,
-    /// чтобы знать, где у семейства фасад.
+    /// Поиск и исправление отзеркаленных окон — только относительно осей самого окна. Сторону стены не проверяем:
+    /// стену могли нарисовать «не той» стороной, это не ошибка окна.
+    /// Отражение — по Hand/FacingOrientation (FamilyCoords.InstanceFrame): GetTransform() у отражённого экземпляра
+    /// отражения не показывает, а флаг Mirrored не сбрасывается стрелками «Отразить».
     /// </summary>
     public static class MirrorCheck
     {
-        public static List<WindowIssue> Find(Document doc, IEnumerable<FamilyInstance> instances, Func<FamilyInstance, bool?> exteriorPositiveY)
-        {
-            var res = new List<WindowIssue>();
-            foreach (var inst in instances)
-            {
-                var issue = Check(inst, exteriorPositiveY(inst));
-                if (issue.Mirrored || issue.WrongSide) res.Add(issue);
-            }
-            return res;
-        }
+        public static List<WindowIssue> Find(IEnumerable<FamilyInstance> instances) =>
+            instances.Where(IsMirrored).Select(i => new WindowIssue { Inst = i }).ToList();
 
-        static WindowIssue Check(FamilyInstance inst, bool? extPosY)
-        {
-            // GetTransform() у отражённого экземпляра без отражения, а флаг Mirrored не сбрасывается стрелками
-            // «Отразить» — отражение и сторону фасада смотрим по Hand/FacingOrientation (FamilyCoords.InstanceFrame).
-            var t = FamilyCoords.InstanceFrame(inst);
-            var issue = new WindowIssue { Inst = inst, Mirrored = t.HasReflection };
-            if (extPosY.HasValue && inst.Host is Wall wall)
-            {
-                var famExterior = extPosY.Value ? t.BasisY : -t.BasisY;
-                issue.WrongSide = famExterior.DotProduct(wall.Orientation) < 0;
-            }
-            return issue;
-        }
+        public static bool IsMirrored(FamilyInstance inst) => FamilyCoords.InstanceFrame(inst).HasReflection;
 
         public static IEnumerable<FamilyInstance> InstancesOf(Document doc, Family family) =>
             new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance)).Cast<FamilyInstance>()
                 .Where(i => i.Symbol.Family.Id == family.Id);
-
-        /// <summary>Конфигурация окна по экземпляру (с кэшем по типу).</summary>
-        public static Func<FamilyInstance, bool?> ExteriorResolver()
-        {
-            var cache = new Dictionary<ElementId, bool?>();
-            return inst =>
-            {
-                var sid = inst.Symbol.Id;
-                if (!cache.TryGetValue(sid, out var v))
-                {
-                    var cfg = WindowConfig.FromJson(inst.Symbol.LookupParameter(WindowParams.Config)?.AsString());
-                    v = cfg?.ExteriorPositiveY;
-                    cache[sid] = v;
-                }
-                return v;
-            };
-        }
-
         public enum Choice { Continue, Fixed, Selected, Cancel }
 
         /// <summary>
@@ -78,14 +38,11 @@ namespace WindowEditor.RevitSide
         public static Choice Report(UIDocument uidoc, List<WindowIssue> issues, string scope, bool allowContinue)
         {
             if (issues.Count == 0) return Choice.Continue;
-            int mirrored = issues.Count(i => i.Mirrored);
-            int wrong = issues.Count(i => i.WrongSide);
             int grouped = issues.Count(i => i.InGroup);
             int fixable = issues.Count(i => !i.InGroup && CanFix(i));
 
             var lines = new List<string>();
-            if (mirrored > 0) lines.Add($"• отзеркалено: {mirrored}");
-            if (wrong > 0) lines.Add($"• наружной стороной в помещение: {wrong}");
+            lines.Add($"• отзеркалено: {issues.Count}");
             if (grouped > 0) lines.Add($"• из них в группах: {grouped} — исправляются только в редакторе группы");
 
             var td = new TaskDialog("Редактор окна")
@@ -122,12 +79,10 @@ namespace WindowEditor.RevitSide
             }
         }
 
-        static bool CanFix(WindowIssue i) =>
-            (!i.Mirrored || i.Inst.CanFlipHand || i.Inst.CanFlipFacing) && (!i.WrongSide || i.Inst.CanFlipFacing);
+        static bool CanFix(WindowIssue i) => i.Inst.CanFlipHand || i.Inst.CanFlipFacing;
 
         /// <summary>
-        /// Снять отражение и развернуть фасадом наружу.
-        /// flipFacing меняет и сторону, и чётность отражения; flipHand — только отражение.
+        /// Снять отражение: flipHand (отражение по оси окна), если нельзя — flipFacing.
         /// </summary>
         static int Fix(Document doc, IEnumerable<WindowIssue> issues)
         {
@@ -140,13 +95,9 @@ namespace WindowEditor.RevitSide
                     try
                     {
                         var inst = i.Inst;
-                        if (i.WrongSide && inst.CanFlipFacing) inst.flipFacing(); // сторона исправлена, отражение переключилось
-                        doc.Regenerate();
-                        if (FamilyCoords.InstanceFrame(inst).HasReflection)
-                        {
-                            if (inst.CanFlipHand) inst.flipHand();
-                            else continue;
-                        }
+                        if (inst.CanFlipHand) inst.flipHand();
+                        else if (inst.CanFlipFacing) inst.flipFacing();
+                        else continue;
                         n++;
                     }
                     catch (Exception) { /* окно, которое нельзя отразить, оставляем как есть */ }

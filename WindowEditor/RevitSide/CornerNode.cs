@@ -113,11 +113,7 @@ namespace WindowEditor.RevitSide
             return ext;
         }
 
-        static ElementId MaterialId(Document doc, string name)
-        {
-            var m = new FilteredElementCollector(doc).OfClass(typeof(Material)).Cast<Material>().FirstOrDefault(x => x.Name == name);
-            return m?.Id ?? Material.Create(doc, name);
-        }
+        static ElementId MaterialId(Document doc, string name) => WindowMaterials.GetOrCreate(doc, name);
     }
 
     /// <summary>
@@ -305,11 +301,11 @@ namespace WindowEditor.RevitSide
             s.N = Flat(s.Wall.Orientation).Normalize();
             s.FaceO = pf != null ? Flat(pf.Origin) : Flat(((LocationCurve)s.Wall.Location).Curve.GetEndPoint(0)) + s.N * (s.Wall.Width / 2);
 
-            var level = doc.GetElement(inst.LevelId) as Level;
-            double sill = inst.get_Parameter(BuiltInParameter.INSTANCE_SILL_HEIGHT_PARAM)?.AsDouble() ?? 0;
+            // «Высота нижнего бруса» отсчитывается до плоскости «Подоконник», а не до начала семейства,
+            // поэтому низ проёма = начало семейства в модели + отметка низа проёма в семействе
             double famSill = inst.Symbol.LookupParameter(SillZ)?.AsDouble() ?? 0;
-            s.ZBottom = (level?.Elevation ?? 0) + sill + famSill;
-            if (inst.GetTransform().HasReflection)
+            s.ZBottom = inst.GetTotalTransform().Origin.Z + famSill;
+            if (FamilyCoords.InstanceFrame(inst).HasReflection) // у GetTransform отражения не бывает
                 errors.Add($"«{inst.Symbol.FamilyName}» отзеркалено — сначала исправьте (кнопка «Проверить окна»).");
             return s;
         }

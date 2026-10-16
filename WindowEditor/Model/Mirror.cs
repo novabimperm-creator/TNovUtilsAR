@@ -93,6 +93,23 @@ namespace WindowEditor.Model
         public static string WithSize(string name, double width, double height) =>
             $"{StripSize(name)}_{Math.Round(width):0}х{Math.Round(height):0}";
 
+        /// <summary>Имя единственного типа: «имя_ШхВ_цвет рамы».</summary>
+        public static string TypeName(string familyName, string frameMaterial)
+        {
+            var color = FrameColor(frameMaterial);
+            return string.IsNullOrEmpty(color) ? familyName : $"{familyName}_{color}";
+        }
+
+        /// <summary>Цвет рамы из названия материала: «ПВХ белый» → «белый», остальное — как есть.</summary>
+        public static string FrameColor(string material)
+        {
+            var m = (material ?? "").Trim();
+            var r = Regex.Replace(m, @"^(ПВХ|PVC)\s+", "", RegexOptions.IgnoreCase).Trim();
+            // символы, недопустимые в именах типов Revit
+            r = Regex.Replace(r, @"[\\:{}\[\];<>?`~|]", " ").Trim();
+            return r.Length > 0 ? r : m;
+        }
+
         /// <summary>Подставить код схемы в имя: заменяет первое число (с запятыми) или дописывает в конец.</summary>
         public static string WithCode(string name, string code)
         {
