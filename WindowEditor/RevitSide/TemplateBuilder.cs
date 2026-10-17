@@ -434,6 +434,22 @@ namespace WindowEditor.RevitSide
                 doc.Regenerate(); // без регенерации между записями Revit считает, что ничего не изменилось
                 fm.Set(p, Ft(mm));
             }
+            // При большой смене толщины решатель может поставить плоскость «по другую сторону» грани
+            // (запас 50 мм внутрь стены вместо наружу). Поэтому сначала сами ставим зависимые плоскости на место.
+            var planes = new FilteredElementCollector(doc).OfClass(typeof(ReferencePlane)).Cast<ReferencePlane>().ToList();
+            double PlaneOf(string name) => planes.First(r => r.Name == name).GetPlane().Origin.Y;
+            void Place(string name, double y)
+            {
+                var rp = planes.FirstOrDefault(r => r.Name == name);
+                double d = rp == null ? 0 : y - rp.GetPlane().Origin.Y;
+                if (Math.Abs(d) > 1e-6) ElementTransformUtils.MoveElement(doc, rp.Id, new XYZ(0, d, 0));
+            }
+            double yExt = PlaneOf(PlaneExterior), yInt = PlaneOf(PlaneInterior);
+            Place(PlaneExtMargin, yExt + Ft(MarginMm));
+            Place(PlaneIntMargin, yInt - Ft(MarginMm));
+            Place(PlaneQuarter, yExt - Ft(QuarterPlaneMm(cfg)));
+            doc.Regenerate();
+
             // плоскость четверти нужна всегда (от неё идут обе пустоты); без четверти пустоты Н = О
             Resolve(PQuarterDepth, QuarterPlaneMm(cfg));
             Resolve(PMargin, MarginMm);
