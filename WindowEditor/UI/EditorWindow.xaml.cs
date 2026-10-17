@@ -43,7 +43,7 @@ namespace WindowEditor.UI
         // поля вкладки «Проём»
         readonly List<NumField> _openingFields = new List<NumField>();
         CheckBox _extPosBox;
-        TextBlock _overlapText;
+        TextBlock _overlapText, _hostText;
 
         static readonly (FillKind kind, string name)[] Fills =
         {
@@ -588,7 +588,15 @@ namespace WindowEditor.UI
             var c = (Func<WindowConfig>)(() => Config);
 
             Header("Стена");
-            Num("Толщина стены", () => c().WallThickness, v => c().WallThickness = v, 50);
+            Num("Толщина стены, всего", () => c().WallThickness, v => c().WallThickness = v, 50,
+                "Суммарно: стена-основа окна и отдельные стены отделки по бокам");
+            Num("в т.ч. наружная отделка", () => c().FinishExterior, v => c().FinishExterior = v, 0,
+                "Отдельная стена снаружи основы (утеплитель, облицовка). Её нужно соединить с основой («Соединить»), чтобы окно её прорезало");
+            Num("в т.ч. внутренняя отделка", () => c().FinishInterior, v => c().FinishInterior = v, 0,
+                "Отдельная стена изнутри основы. Её нужно соединить с основой («Соединить»), чтобы окно её прорезало");
+            g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            _hostText = new TextBlock { Foreground = _pal.Muted, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) };
+            Grid.SetRow(_hostText, row++); Grid.SetColumnSpan(_hostText, 2); g.Children.Add(_hostText);
             Header("Положение рамы в стене");
             BuildDepthControls(g, ref row);
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -761,6 +769,9 @@ namespace WindowEditor.UI
             // стена с четвертью
             Box(0, t, -(H - yEdge) / s, 0, wall, ink);
             if (_geo.HasQuarter && c.QuarterDepth > 0) Box(0, Math.Min(c.QuarterDepth, t), 0, c.QuarterSide, wall, ink);
+            // границы основы и отделки — пунктир поперёк стены
+            foreach (var dd in new[] { c.FinishExterior, t - c.FinishInterior }.Where(v => v > 0.5 && v < t - 0.5))
+                cv.Children.Add(new Line { X1 = X(dd), X2 = X(dd), Y1 = yEdge, Y2 = H, Stroke = ink, StrokeThickness = 0.8, StrokeDashArray = new DoubleCollection { 3, 2 } });
 
             var rf = c.RevealFor("Левый");
             double gap = c.GapSideEff;
@@ -818,6 +829,10 @@ namespace WindowEditor.UI
                 (Config.BlockFromExterior < 0 || Config.BlockToInterior < 0 ? " — рама выходит из стены!" : "");
             _depthInfo.Foreground = Config.BlockFromExterior < 0 || Config.BlockToInterior < 0 ? _pal.Error : _pal.Muted;
             DrawDepth();
+            _hostText.Text = Config.FinishExterior > 0 || Config.FinishInterior > 0
+                ? $"Стена-основа окна: {Config.HostThickness:0} мм. Стены отделки соедините с основой — окно прорежет их тоже."
+                : "";
+            _hostText.Foreground = Config.WallThickness - Config.FinishExterior - Config.FinishInterior < 1 ? _pal.Error : _pal.Muted;
             _overlapText.Text = _geo.HasQuarter
                 ? $"Заход рамы за четверть: {_geo.QuarterOverlap:0} мм{(_geo.QuarterOverlap < 10 ? " — мало, увеличьте четверть или уменьшите зазор" : "")}"
                 : "";
@@ -1373,6 +1388,11 @@ namespace WindowEditor.UI
             if (string.IsNullOrWhiteSpace(Mirror.StripSize(FamilyNameBox.Text)) || FamilyName.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0)
             {
                 Hint("Введите корректное имя семейства (без символов \\ / : * ? \" < > |).");
+                return;
+            }
+            if (Config.WallThickness - Config.FinishExterior - Config.FinishInterior < 50)
+            {
+                Hint("Стена-основа окна тоньше 50 мм: суммарная толщина стены должна быть больше наружной и внутренней отделки вместе.");
                 return;
             }
             if (Config.BlockFromExterior < 0 || Config.BlockToInterior < 0)

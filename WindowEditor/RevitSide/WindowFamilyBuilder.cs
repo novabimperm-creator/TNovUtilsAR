@@ -129,7 +129,7 @@ namespace WindowEditor.RevitSide
         double Z(double z) => C.Z(z);
         XYZ P(double x, double z) => new XYZ(X(x), _anchorY, Z(z));
 
-        /// <summary>Толщина стены-основы в семействе = толщине из схемы (меняем самый толстый слой).</summary>
+        /// <summary>Толщина стены-основы в семействе = толщине основы из схемы, без отделки (меняем самый толстый слой).</summary>
         void AdjustHostWall()
         {
             try
@@ -138,7 +138,7 @@ namespace WindowEditor.RevitSide
                 var cs = wall?.WallType.GetCompoundStructure();
                 if (cs == null) return;
                 var layers = cs.GetLayers();
-                double total = layers.Sum(l => l.Width), target = Ft(_cfg.WallThickness);
+                double total = layers.Sum(l => l.Width), target = Ft(_cfg.HostThickness);
                 if (Math.Abs(total - target) < 1e-6) return;
                 int idx = Enumerable.Range(0, layers.Count).OrderByDescending(i => layers[i].Width).First();
                 double w = layers[idx].Width + (target - total);
@@ -152,17 +152,18 @@ namespace WindowEditor.RevitSide
 
         /// <summary>
         /// Опорная плоскость шаблона, от которой отсчитывается рама, — по привязке схемы. Глубины схемы (от наружной
-        /// грани, по толщине стены из схемы) пересчитываются от неё, а в проекте она стоит на своей грани фактической стены.
+        /// грани всей стены, с отделкой) пересчитываются от неё; плоскости шаблона стоят на гранях стены-основы, а отделка —
+        /// отдельные стены снаружи и изнутри основы, поэтому глубина плоскости = отделка + положение в основе.
         /// </summary>
         void SetupAnchor()
         {
             string name; double depth;
             switch (_cfg.Anchor)
             {
-                case FrameAnchor.Quarter: name = TemplateBuilder.PlaneQuarter; depth = TemplateBuilder.QuarterPlaneMm(_cfg); break;
-                case FrameAnchor.Center: name = TemplateBuilder.PlaneCenterY; depth = _cfg.WallThickness / 2; break;
-                case FrameAnchor.Interior: name = TemplateBuilder.PlaneInterior; depth = _cfg.WallThickness; break;
-                default: name = TemplateBuilder.PlaneExterior; depth = 0; break;
+                case FrameAnchor.Quarter: name = TemplateBuilder.PlaneQuarter; depth = _cfg.FinishExterior + TemplateBuilder.QuarterPlaneMm(_cfg); break;
+                case FrameAnchor.Center: name = TemplateBuilder.PlaneCenterY; depth = _cfg.FinishExterior + _cfg.HostThickness / 2; break;
+                case FrameAnchor.Interior: name = TemplateBuilder.PlaneInterior; depth = _cfg.WallThickness - _cfg.FinishInterior; break;
+                default: name = TemplateBuilder.PlaneExterior; depth = _cfg.FinishExterior; break;
             }
             var rp = new FilteredElementCollector(_doc).OfClass(typeof(ReferencePlane)).Cast<ReferencePlane>().First(r => r.Name == name);
             _anchor = SketchPlane.Create(_doc, rp.Id);

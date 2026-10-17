@@ -18,7 +18,7 @@ namespace WindowEditor.RevitSide
             _signX = cfg.ExteriorPositiveY ? -1 : 1;
             _signY = cfg.ExteriorPositiveY ? 1 : -1;
             _halfWidth = geo.OpeningWidth / 2;
-            _halfWall = cfg.WallThickness / 2;
+            _halfWall = cfg.FinishExterior + cfg.HostThickness / 2; // начало семейства — ось стены-основы
             _sillZ = sillZ;
         }
 

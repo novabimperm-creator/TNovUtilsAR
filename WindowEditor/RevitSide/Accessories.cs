@@ -120,8 +120,8 @@ namespace WindowEditor.RevitSide
                       ?? throw new InvalidOperationException("не читается WE_Config");
             if (!(w.Host is Wall wall)) throw new InvalidOperationException("окно не в стене");
 
-            // геометрия — по фактической стене, а не по толщине из схемы
-            cfg.WallThickness = Mm(wall.Width);
+            // геометрия — по фактической стене-основе (отделка — из схемы), а не по толщине из схемы
+            cfg.WallThickness = Mm(wall.Width) + cfg.FinishExterior + cfg.FinishInterior;
             var geo = new WindowGeometry(cfg);
             double sillZ = w.Symbol.LookupParameter(SillZ)?.AsDouble() ?? 0;
             var c = new FamilyCoords(cfg, geo, sillZ);

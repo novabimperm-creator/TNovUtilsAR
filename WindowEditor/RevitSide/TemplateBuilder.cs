@@ -445,20 +445,31 @@ namespace WindowEditor.RevitSide
                 if (Math.Abs(d) > 1e-6) ElementTransformUtils.MoveElement(doc, rp.Id, new XYZ(0, d, 0));
             }
             double yExt = PlaneOf(PlaneExterior), yInt = PlaneOf(PlaneInterior);
-            Place(PlaneExtMargin, yExt + Ft(MarginMm));
-            Place(PlaneIntMargin, yInt - Ft(MarginMm));
+            double margin = CutMarginMm(cfg);
+            Place(PlaneExtMargin, yExt + Ft(margin));
+            Place(PlaneIntMargin, yInt - Ft(margin));
             Place(PlaneQuarter, yExt - Ft(QuarterPlaneMm(cfg)));
             doc.Regenerate();
 
             // плоскость четверти нужна всегда (от неё идут обе пустоты); без четверти пустоты Н = О
             Resolve(PQuarterDepth, QuarterPlaneMm(cfg));
-            Resolve(PMargin, MarginMm);
+            Resolve(PMargin, margin);
             doc.Regenerate();
         }
 
-        /// <summary>Глубина плоскости «Четверть» от наружной грани, мм: не меньше 1 мм и меньше толщины стены.</summary>
+        /// <summary>
+        /// Глубина плоскости «Четверть» от наружной грани стены-основы, мм: не меньше 1 мм и меньше толщины основы.
+        /// Четверть в схеме считается от наружной грани всей стены (с отделкой); если она целиком в отделке — 1 мм.
+        /// </summary>
         public static double QuarterPlaneMm(Model.WindowConfig cfg) =>
-            Math.Max(1, Math.Min(cfg.QuarterDepth, cfg.WallThickness - 1));
+            Math.Max(1, Math.Min(cfg.QuarterDepth - cfg.FinishExterior, cfg.HostThickness - 1));
+
+        /// <summary>
+        /// Вылет пустот за грани основы, мм: запас + отделка. Тогда окно режет и стены отделки, присоединённые
+        /// к основе («Соединить» геометрию). Параметр запаса общий для обеих сторон — берём большую отделку.
+        /// </summary>
+        public static double CutMarginMm(Model.WindowConfig cfg) =>
+            MarginMm + Math.Max(Math.Max(0, cfg.FinishExterior), Math.Max(0, cfg.FinishInterior));
 
         /// <summary>Проверка гибкости: меняем параметры и смотрим, что пустоты пошли за ними. Откатывается.</summary>
         static string Flex(Document doc)

@@ -136,30 +136,22 @@ namespace WindowEditor.RevitSide
             }
         }
 
-        /// <summary>Толщина стены (и четверть для чужих окон) — по стене, в которой стоит окно.</summary>
+        /// <summary>
+        /// Для чужих окон (без схемы редактора) — толщина стены и четверть по стене, в которой стоит окно.
+        /// У окон редактора толщину не трогаем: она суммарная, вместе с отдельными стенами отделки, и задаётся в схеме.
+        /// </summary>
         static void SyncWithHostWall(FamilyInstance inst, WindowConfig cfg, bool legacy)
         {
             if (!(inst.Host is Wall wall)) return;
-            double t = Math.Round(WindowParams.Mm(wall.Width));
-            if (Math.Abs(t - cfg.WallThickness) > 0.5)
-            {
-                var td = new TaskDialog("Редактор окна")
-                {
-                    MainInstruction = "Толщина стены отличается",
-                    MainContent = $"Стена: {t:0} мм, в настройках окна: {cfg.WallThickness:0} мм. Взять толщину стены?",
-                    CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
-                };
-                if (td.Show() == TaskDialogResult.Yes) cfg.WallThickness = t;
-            }
-
             if (legacy)
             {
+                cfg.WallThickness = Math.Round(WindowParams.Mm(wall.Width));
                 // Четверть по умолчанию — толщина наружного слоя, если слоёв больше одного
                 var cs = wall.WallType.GetCompoundStructure();
                 if (cs != null && cs.LayerCount > 1)
                 {
                     double outer = WindowParams.Mm(cs.GetLayerWidth(0));
-                    if (outer >= 50 && outer < t / 2) { cfg.QuarterDepth = Math.Round(outer); cfg.QuarterSide = 65; cfg.QuarterTop = 65; }
+                    if (outer >= 50 && outer < cfg.WallThickness / 2) { cfg.QuarterDepth = Math.Round(outer); cfg.QuarterSide = 65; cfg.QuarterTop = 65; }
                 }
             }
         }

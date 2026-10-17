@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
@@ -174,7 +175,14 @@ namespace WindowEditor.Model
         public double ConnectorWidth { get; set; } = 10;
 
         // ---- Проём и стена, мм ----
+        /// <summary>Суммарная толщина стены: основа окна + отдельные стены отделки снаружи и изнутри.</summary>
         public double WallThickness { get; set; } = 400;
+        /// <summary>Наружная отделка — отдельная стена снаружи основы (утеплитель, облицовка), мм.</summary>
+        public double FinishExterior { get; set; }
+        /// <summary>Внутренняя отделка — отдельная стена изнутри основы, мм.</summary>
+        public double FinishInterior { get; set; }
+        /// <summary>Толщина стены-основы окна (без отделки), мм.</summary>
+        [JsonIgnore] public double HostThickness => Math.Max(1, WallThickness - FinishExterior - FinishInterior);
         /// <summary>true — фасад со стороны +Y семейства.</summary>
         public bool ExteriorPositiveY { get; set; } = true;
         /// <summary>Привязка рамы по глубине.</summary>

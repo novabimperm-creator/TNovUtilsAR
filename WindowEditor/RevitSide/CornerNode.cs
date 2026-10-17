@@ -204,7 +204,7 @@ namespace WindowEditor.RevitSide
             var ia = CornerInterval(a); var ib = CornerInterval(b);
             Same(ia.T, ib.T, "высота проёма у угла");
             foreach (var s in sides)
-                Same(Math.Round(Mm(s.Wall.Width)), s.Cfg.WallThickness, $"толщина стены «{s.Wall.Name}» и окна «{s.Inst.Symbol.FamilyName}»");
+                Same(Math.Round(Mm(s.Wall.Width)), s.Cfg.HostThickness, $"толщина стены «{s.Wall.Name}» и основы окна «{s.Inst.Symbol.FamilyName}» (без отделки)");
             if (errors.Count > 0) { message = string.Join("\n", errors); return Result.Failed; }
 
             var lead = a.Cfg.CornerLead ? a : b;
