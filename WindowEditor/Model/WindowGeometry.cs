@@ -355,19 +355,16 @@ namespace WindowEditor.Model
                     double blockBottom = st.Y;
                     if (blockBottom - r.B > 500 || blockBottom < r.B) continue; // не под рамой этой секции
 
-                    // под дверью подоконника и отлива нет
-                    bool door = !Cfg.EmptyOpening && sg.Layout.Units.Any(u => u.Cell.IsDoor &&
-                        Math.Abs(u.R.Y - Cfg.FrameWidth - blockBottom) < 1 &&
-                        Math.Min(u.R.Right, r.X1) - Math.Max(u.R.X, r.X0) > Eps);
-
+                    // подоконник и отлив — на весь участок низа, в том числе под дверью: у окна «в пол» они идут на всю
+                    // ширину проёма, у двери с поднятой оконной частью — по низу двери (оконная часть — своим участком)
                     SillRuns.Add(new SillRun
                     {
                         S = sg, X0 = r.X0, X1 = r.X1,
                         OpenBottom = r.B, BlockBottom = blockBottom,
                         WallLeft = IsWallBeside(r.X0 - 1, r.B) && !(Cfg.Corner == CornerSide.Left && r.X0 <= Eps),
                         WallRight = IsWallBeside(r.X1 + 1, r.B) && !(Cfg.Corner == CornerSide.Right && r.X1 >= OpeningWidth - Eps),
-                        HasIn = !door && sg.S.SillIn.Enabled,
-                        HasOut = !door && sg.S.OuterKind != OuterSillKind.None
+                        HasIn = sg.S.SillIn.Enabled,
+                        HasOut = sg.S.OuterKind != OuterSillKind.None
                     });
                 }
             }
@@ -409,14 +406,18 @@ namespace WindowEditor.Model
             {
                 var s = r.S.S;
                 int n = r.S.Index + 1;
+                // несколько участков в секции (например, по бокам двери) — у каждого своя метка: по ней элементы
+                // комплектации сопоставляются с моделью, одинаковые метки затирали бы друг друга
+                var same = SillRuns.Where(x => x.S == r.S && (x.HasIn || x.HasOut)).ToList();
+                string label = same.Count > 1 ? $"Секция {n}, участок {same.IndexOf(r) + 1}" : $"Секция {n}";
                 if (r.HasIn)
-                    AddSill(r, s.SillIn, "Подоконник внутренний", $"Секция {n}", $"WE_Мат. Подоконник вн. С{n}",
+                    AddSill(r, s.SillIn, "Подоконник внутренний", label, $"WE_Мат. Подоконник вн. С{n}",
                         B + FD - (c.EmptyOpening ? 0 : s.SillIn.Inset), t + s.SillIn.Projection, false);
                 if (r.HasOut)
                 {
                     var o = s.Outer;
                     bool drip = s.OuterKind == OuterSillKind.Drip;
-                    AddSill(r, o, drip ? "Отлив" : "Подоконник наружный", $"Секция {n}",
+                    AddSill(r, o, drip ? "Отлив" : "Подоконник наружный", label,
                         drip ? $"WE_Мат. Отлив С{n}" : $"WE_Мат. Подоконник нар. С{n}",
                         -o.Projection, B + (c.EmptyOpening ? 0 : o.Inset), true); // в пустом проёме доска и отлив стыкуются по плоскости рамы
                 }
