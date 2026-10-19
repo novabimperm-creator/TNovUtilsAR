@@ -320,7 +320,7 @@ namespace WindowEditor.RevitSide
                 double midZ = g.Y + g.H / 2, midX = g.X + g.W / 2;
                 if (left) Tri(g.Right, g.Top, g.X, midZ, g.Right, g.Y);
                 if (right) Tri(g.X, g.Top, g.Right, midZ, g.X, g.Y);
-                if (tilt) Tri(g.X, g.Top, midX, g.Y, g.Right, g.Top);
+                if (tilt) Tri(g.X, g.Y, midX, g.Top, g.Right, g.Y); // вершина вверху
 
                 // ---- зона открывания ----
                 if (left || right) OpeningZone(sp, fy, outer, left);
