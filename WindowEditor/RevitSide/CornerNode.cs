@@ -9,6 +9,7 @@ using Autodesk.Revit.DB.Structure;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Selection;
 using WindowEditor.Model;
+using WindowEditor.UI;
 using static WindowEditor.RevitSide.WindowParams;
 
 namespace WindowEditor.RevitSide
@@ -275,7 +276,7 @@ namespace WindowEditor.RevitSide
                 t.Commit();
             }
 
-            TaskDialog.Show("Угловое окно",
+            NotifyWindow.Show("Угловое окно",
                 (spec.Post > 0 ? $"Угловой соединитель {spec.Post:0}×{spec.Post:0} мм поставлен, угол стен вырезан." : "Угол пустого проёма вырезан.") +
                 (grouped ? "\n\nОкна в группе: добавьте узел в группу вручную («Изменить группу» → «Добавить»), иначе в копиях группы его не будет." : ""));
             return Result.Succeeded;

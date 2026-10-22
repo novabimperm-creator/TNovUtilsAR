@@ -4,6 +4,7 @@ using System.Linq;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using WindowEditor.Model;
+using WindowEditor.UI;
 
 namespace WindowEditor.RevitSide
 {
@@ -45,34 +46,29 @@ namespace WindowEditor.RevitSide
             lines.Add($"• отзеркалено: {issues.Count}");
             if (grouped > 0) lines.Add($"• из них в группах: {grouped} — исправляются только в редакторе группы");
 
-            var td = new TaskDialog("Редактор окна")
-            {
-                MainInstruction = $"{scope}: найдено окон с нарушениями — {issues.Count}",
-                MainContent = string.Join("\n", lines) +
-                              "\n\nОкна нельзя зеркалить: схема открывания, марка и спецификация перестают соответствовать модели. " +
-                              "Для левого варианта сделайте отдельное семейство кнопкой «Отразить Л/П».",
-                AllowCancellation = true
-            };
+            string text = $"{scope}: найдено окон с нарушениями — {issues.Count}.\n" + string.Join("\n", lines) +
+                          "\n\nОкна нельзя зеркалить: схема открывания, марка и спецификация перестают соответствовать модели. " +
+                          "Для левого варианта сделайте отдельное семейство кнопкой «Отразить Л/П».";
+            var options = new List<(Choice c, string label, string hint)>();
             if (fixable > 0)
-                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, $"Исправить ({fixable} шт.)",
-                    "Отразить экземпляры обратно стрелками «Отразить». Окна в группах не трогаются.");
-            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Выделить их и выйти",
-                "Чтобы посмотреть и исправить вручную.");
-            if (allowContinue)
-                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, "Продолжить без исправления");
+                options.Add((Choice.Fixed, $"Исправить ({fixable} шт.)", "Отразить экземпляры обратно стрелками «Отразить». Окна в группах не трогаются."));
+            options.Add((Choice.Selected, "Выделить их и выйти", "Чтобы посмотреть и исправить вручную."));
+            if (allowContinue) options.Add((Choice.Continue, "Продолжить без исправления", null));
+            int pick = NotifyWindow.Choose("Отзеркаленные окна", text,
+                options.Select(o => o.label).ToArray(), options.Select(o => o.hint).ToArray());
 
-            switch (td.Show())
+            switch (pick < 0 ? Choice.Cancel : options[pick].c)
             {
-                case TaskDialogResult.CommandLink1:
+                case Choice.Fixed:
                     int done = Fix(uidoc.Document, issues.Where(i => !i.InGroup));
-                    TaskDialog.Show("Редактор окна", $"Исправлено окон: {done}." +
+                    NotifyWindow.Show("Редактор окна", $"Исправлено окон: {done}." +
                         (grouped > 0 ? $" В группах осталось: {grouped} — они выделены." : ""));
                     if (grouped > 0) Select(uidoc, issues.Where(i => i.InGroup));
                     return Choice.Fixed;
-                case TaskDialogResult.CommandLink2:
+                case Choice.Selected:
                     Select(uidoc, issues);
                     return Choice.Selected;
-                case TaskDialogResult.CommandLink3:
+                case Choice.Continue:
                     return Choice.Continue;
                 default:
                     return Choice.Cancel;

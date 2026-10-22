@@ -41,14 +41,11 @@ namespace WindowEditor.RevitSide
             bool legacy = cfg == null;
             if (legacy)
             {
-                var td = new TaskDialog("Редактор окна")
-                {
-                    MainInstruction = "Окно создано не редактором",
-                    MainContent = "Семейство будет пересоздано из шаблона WE_Окно по схеме редактора, своя геометрия семейства пропадёт. " +
-                                  "Лучше создать новое окно командой «Новое окно» и заменить им старое.\n\nПродолжить?",
-                    CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
-                };
-                if (td.Show() != TaskDialogResult.Yes) return Result.Cancelled;
+                if (!NotifyWindow.Ask("Окно создано не редактором",
+                        "Семейство будет пересоздано из шаблона WE_Окно по схеме редактора, своя геометрия семейства пропадёт. " +
+                        "Лучше создать новое окно командой «Новое окно» и заменить им старое.\n\nПродолжить?",
+                        "Пересоздать", "Отмена"))
+                    return Result.Cancelled;
                 cfg = Presets.Create(0);
                 cfg.Sections[0].Width = WindowParams.SymbolDim(symbol, true) - 2 * cfg.GapSide;
                 cfg.Sections[0].Height = WindowParams.SymbolDim(symbol, false) - cfg.GapTop - cfg.Sections[0].GapBottom;
@@ -62,14 +59,36 @@ namespace WindowEditor.RevitSide
             SyncWithHostWall(inst, cfg, legacy);
 
             if (family.GetFamilySymbolIds().Count > 1)
-                TaskDialog.Show("Редактор окна",
+                NotifyWindow.Show("Редактор окна",
                     $"В семействе «{family.Name}» несколько типов. Редактор ведёт правило «одно окно — одно семейство — один тип» " +
                     "(семейство «имя_ШхВ», тип «имя_ШхВ_цвет рамы»): в семействе останется только тип выбранного окна, геометрия изменится у всех его типов. " +
                     "Для отдельного окна включите «Сохранить как новое семейство».");
 
+            string familyBefore = legacy ? null : FamilyPart(cfg);
             var win = new EditorWindow(cfg, family.Name, canSaveAsNew: true, materials: ProjectMaterials(doc));
             new WindowInteropHelper(win).Owner = data.Application.MainWindowHandle;
             if (win.ShowDialog() != true) return Result.Cancelled;
+
+            // изменилась только комплектация (подоконники, отливы, откосы) — семейство не перестраиваем:
+            // схема записывается в тип, элементы комплектации пересчитываются (секунды вместо перезагрузки семейства)
+            if (familyBefore != null && !win.SaveAsNew && win.FamilyName == family.Name &&
+                symbol.Name == Mirror.TypeName(win.FamilyName, win.Config.FrameMaterial) &&
+                symbol.LookupParameter(TemplateBuilder.PBase) != null && FamilyPart(win.Config) == familyBefore)
+            {
+                var p = symbol.LookupParameter(WindowParams.Config);
+                if (p != null && !p.IsReadOnly)
+                {
+                    using (var t = new Transaction(doc, "Комплектация окна"))
+                    {
+                        t.Start();
+                        p.Set(win.Config.ToJson());
+                        t.Commit();
+                    }
+                    var quick = Accessories.Update(doc, Accessories.WindowsOf(doc, family), removeOrphans: false);
+                    if (quick.Problems.Count > 0) NotifyWindow.Show("Комплектация окон", quick.ToString());
+                    return Result.Succeeded;
+                }
+            }
 
             // имя семейства и типа — «имя_ШхВ»: смена размера переименовывает это же семейство,
             // новое семейство — только если изменилось само имя или включено «Сохранить как новое»
@@ -126,7 +145,7 @@ namespace WindowEditor.RevitSide
 
                 // комплектация в модели — под новую схему у всех экземпляров семейства
                 var report = Accessories.Update(doc, Accessories.WindowsOf(doc, fam), removeOrphans: false);
-                if (report.Problems.Count > 0) TaskDialog.Show("Комплектация окон", report.ToString());
+                if (report.Problems.Count > 0) NotifyWindow.Show("Комплектация окон", report.ToString());
                 return Result.Succeeded;
             }
             catch (Exception ex)
@@ -156,6 +175,23 @@ namespace WindowEditor.RevitSide
             }
         }
 
+        /// <summary>
+        /// Схема без настроек комплектации: от подоконников, отливов и откосов семейство окна не зависит.
+        /// Совпадает до и после правки — семейство перестраивать не нужно.
+        /// </summary>
+        static string FamilyPart(WindowConfig c)
+        {
+            var k = c.Clone();
+            foreach (var s in k.Sections)
+            {
+                s.SillIn = null; s.Drip = null; s.SillOut = null; s.OuterKind = OuterSillKind.None;
+            }
+            k.Reveals = new List<RevealFace>();
+            k.RevealInDefault = null; k.RevealOutDefault = null;
+            k.CornerPostMaterial = null; // угловой соединитель — отдельное семейство узла
+            return k.ToJson();
+        }
+
         internal static List<string> ProjectMaterials(Document doc) =>
             new FilteredElementCollector(doc).OfClass(typeof(Material)).Select(m => m.Name).Distinct().OrderBy(n => n).ToList();
 
@@ -163,7 +199,7 @@ namespace WindowEditor.RevitSide
         {
             if (inst.GroupId != ElementId.InvalidElementId)
             {
-                TaskDialog.Show("Редактор окна",
+                NotifyWindow.Show("Редактор окна",
                     $"Создано семейство «{newSymbol.FamilyName}». Выбранное окно входит в группу, поэтому его тип не заменён — " +
                     "замените его в режиме редактирования группы (изменение применится ко всем экземплярам группы).");
                 return;
@@ -196,7 +232,7 @@ namespace WindowEditor.RevitSide
             var issues = MirrorCheck.Find(windows);
             if (issues.Count == 0)
             {
-                TaskDialog.Show("Редактор окна", $"Проверено окон: {windows.Count}. Отзеркаленных нет.");
+                NotifyWindow.Show("Редактор окна", $"Проверено окон: {windows.Count}. Отзеркаленных нет.");
                 return Result.Succeeded;
             }
             MirrorCheck.Report(uidoc, issues, "Модель", allowContinue: false);

@@ -318,8 +318,9 @@ namespace WindowEditor.RevitSide
                 void Tri(double ax, double az, double bx, double bz, double cx, double cz) { Seg(ax, az, bx, bz); Seg(bx, bz, cx, cz); }
                 var g = inner;
                 double midZ = g.Y + g.H / 2, midX = g.X + g.W / 2;
-                if (left) Tri(g.Right, g.Top, g.X, midZ, g.Right, g.Y);
-                if (right) Tri(g.X, g.Top, g.Right, midZ, g.X, g.Y);
+                // вершина угла — у ручки, напротив петель (как и у откидной: петли внизу, вершина вверху)
+                if (left) Tri(g.X, g.Top, g.Right, midZ, g.X, g.Y);
+                if (right) Tri(g.Right, g.Top, g.X, midZ, g.Right, g.Y);
                 if (tilt) Tri(g.X, g.Y, midX, g.Top, g.Right, g.Y); // вершина вверху
 
                 // ---- зона открывания ----
@@ -423,9 +424,24 @@ namespace WindowEditor.RevitSide
                 sc.LineStyle = style;
                 sc.SetVisibility(v);
             }
+            // «Грубый» — створка линией под 30°, «Средний» — створка на 90° и дуга
             Add(Line.CreateBound(hinge, open30), ViewVis(true, false, false));
-            Add(Line.CreateBound(hinge, open90), ViewVis(false, true, true));
-            Add(Arc.Create(open90, closed, mid45), ViewVis(false, true, true));
+            Add(Line.CreateBound(hinge, open90), ViewVis(false, true, false));
+            Add(Arc.Create(open90, closed, mid45), ViewVis(false, true, false));
+
+            // «Высокий» — как в каталоге: профиль створки со стеклом, открытый на 30°, и дуга до закрытого положения
+            var fine = ViewVis(false, false, true);
+            var u = (open30 - hinge).Normalize();
+            var n = new XYZ(sx * s30, c30, 0);            // толщина створки: в закрытом положении — к улице (+Y)
+            double d = Ft(_cfg.SashDepth), sw = Math.Min(Ft(_cfg.SashWidth), len / 3), g = Ft(_cfg.GlassThickness);
+            XYZ Pt(double along, double across) => hinge + u * along + n * across;
+            void Poly(params XYZ[] pts) { for (int i = 0; i < pts.Length; i++) Add(Line.CreateBound(pts[i], pts[(i + 1) % pts.Length]), fine); }
+            Poly(Pt(0, 0), Pt(len, 0), Pt(len, d), Pt(0, d));
+            double g0 = (d - g) / 2, g1 = (d + g) / 2;
+            if (g > 0 && g1 < d && len - 2 * sw > Ft(10))
+                Poly(Pt(sw, g0), Pt(len - sw, g0), Pt(len - sw, g1), Pt(sw, g1));
+            var mid15 = new XYZ(hx + sx * len * Math.Cos(Math.PI / 12), yIn - len * Math.Sin(Math.PI / 12), z);
+            Add(Arc.Create(open30, closed, mid15), fine);
         }
 
         readonly HashSet<string> _sectionDone = new HashSet<string>();

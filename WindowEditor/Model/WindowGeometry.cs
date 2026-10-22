@@ -50,6 +50,7 @@ namespace WindowEditor.Model
         public double Length, Width, Thickness; // для спецификации
         public string MaterialParam;
         public string Material;
+        public bool VerticalReveal;  // боковой откос (по высоте проёма)
     }
 
     public class Pane
@@ -436,6 +437,25 @@ namespace WindowEditor.Model
                 double dEnd = f.Quartered && c.QuarterDepth > 0 ? Math.Min(c.QuarterDepth, B) : B;
                 if (rf.Out.Enabled) AddReveal(f, rf.Out, false, 0, dEnd);
             }
+            TrimRevealCorners();
+        }
+
+        /// <summary>
+        /// Верхний откос идёт во всю ширину проёма, боковые — под ним: иначе в верхних углах бруски
+        /// накладывались бы друг на друга на квадрат толщина × толщина.
+        /// </summary>
+        void TrimRevealCorners()
+        {
+            var reveals = Boxes.Where(b => b.Kind.StartsWith("Откос")).ToList();
+            foreach (var v in reveals.Where(b => b.VerticalReveal))
+            {
+                var top = reveals.FirstOrDefault(h => !h.VerticalReveal && h.Kind == v.Kind &&
+                    Math.Abs(h.Z1 - v.Z1) < 1 && h.X0 - 1 <= v.X0 && v.X1 <= h.X1 + 1);
+                if (top == null) continue;
+                v.Z1 = top.Z0;
+                v.Length = v.Z1 - v.Z0;
+            }
+            Boxes.RemoveAll(b => b.VerticalReveal && b.Length < 1);
         }
 
         bool IsCornerFace(Face f) =>
@@ -512,6 +532,7 @@ namespace WindowEditor.Model
             };
             if (f.Vertical)
             {
+                b.VerticalReveal = true;
                 if (f.Dir > 0) { b.X0 = f.X; b.X1 = f.X + th; } else { b.X0 = f.X - th; b.X1 = f.X; }
                 b.Z0 = f.Kind == FaceKind.StepTop ? f.Z0 : SillTopAt(f.X, f.Z0, interior);
                 b.Z1 = f.Z1;

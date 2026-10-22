@@ -7,6 +7,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Structure;
 using Autodesk.Revit.UI;
 using WindowEditor.Model;
+using WindowEditor.UI;
 using static WindowEditor.RevitSide.WindowParams;
 
 namespace WindowEditor.RevitSide
@@ -296,20 +297,18 @@ namespace WindowEditor.RevitSide
             bool whole = selected.Count == 0;
             if (whole)
             {
-                var td = new TaskDialog("Комплектация окон")
-                {
-                    MainInstruction = "Обновить комплектацию всех окон редактора в модели?",
-                    MainContent = "Подоконники, отливы и откосы будут подогнаны под окна и стены. Элементы, чьих окон в модели нет, будут удалены.\n\n" +
-                                  "Чтобы обработать только часть окон, выделите их и запустите команду снова.",
-                    CommonButtons = TaskDialogCommonButtons.Ok | TaskDialogCommonButtons.Cancel
-                };
-                if (td.Show() != TaskDialogResult.Ok) return Result.Cancelled;
+                if (!NotifyWindow.Ask("Комплектация окон",
+                        "Обновить комплектацию всех окон редактора в модели?\n\n" +
+                        "Подоконники, отливы и откосы будут подогнаны под окна и стены. Элементы, чьих окон в модели нет, будут удалены.\n\n" +
+                        "Чтобы обработать только часть окон, выделите их и запустите команду снова.",
+                        "Обновить все", "Отмена"))
+                    return Result.Cancelled;
             }
 
             try
             {
                 var report = Accessories.Update(doc, whole ? Accessories.AllWindows(doc) : selected, removeOrphans: whole);
-                TaskDialog.Show("Комплектация окон", report.ToString());
+                NotifyWindow.Show("Комплектация окон", report.ToString());
                 return Result.Succeeded;
             }
             catch (Exception ex)

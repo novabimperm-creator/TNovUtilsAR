@@ -1161,7 +1161,6 @@ namespace WindowEditor.UI
 
         static void OpeningSymbol(MRect g, FillKind f, Action<double, double, double, double> line)
         {
-            // вершина угла — сторона петель
             void Tri(double ax, double ay, double bx, double by, double cx, double cy)
             {
                 line(ax, ay, bx, by);
@@ -1171,8 +1170,9 @@ namespace WindowEditor.UI
             bool right = f == FillKind.TurnRight || f == FillKind.TiltTurnRight || f == FillKind.DoorRight || f == FillKind.DoorTiltRight;
             bool tilt = f == FillKind.Tilt || f == FillKind.TiltTurnLeft || f == FillKind.TiltTurnRight || f == FillKind.DoorTiltLeft || f == FillKind.DoorTiltRight;
             double midY = g.Y + g.H / 2, midX = g.X + g.W / 2;
-            if (left) Tri(g.Right, g.Top, g.X, midY, g.Right, g.Y);
-            if (right) Tri(g.X, g.Top, g.Right, midY, g.X, g.Y);
+            // вершина угла — у ручки, напротив петель
+            if (left) Tri(g.X, g.Top, g.Right, midY, g.X, g.Y);
+            if (right) Tri(g.Right, g.Top, g.X, midY, g.Right, g.Y);
             if (tilt) Tri(g.X, g.Y, midX, g.Top, g.Right, g.Y); // вершина вверху
         }
 
